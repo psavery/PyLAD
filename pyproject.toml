@@ -1,0 +1,16 @@
+[build-system]
+requires = ['setuptools', 'setuptools_scm']
+build-backend = 'setuptools.build_meta'
+
+[project]
+name = 'PyXISL'
+requires-python = '>=3.10'
+dynamic = ['version']
+dependencies = [
+    'numpy',
+]
+readme = 'REAMDE.md'
+
+[tool.black]
+line-length = 79
+skip-string-normalization = true
