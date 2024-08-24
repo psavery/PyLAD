@@ -4,7 +4,7 @@ import json
 
 ERRORS_DICT = json.loads(
     importlib.resources.files(
-        'pyxisl.resources'
+        'pylad.resources'
     ).joinpath('xisl_errors.json').read_text()
 )
 # Keys should be interpreted as integers

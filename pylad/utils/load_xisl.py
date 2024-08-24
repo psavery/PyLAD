@@ -1,7 +1,7 @@
 from ctypes import CDLL
 
-from pyxisl.generated.xisl_ctypes import add_xisl_ctypes
-from pyxisl.utils.xisl_paths import path_to_xisl_library
+from pylad.generated.xisl_ctypes import add_xisl_ctypes
+from pylad.utils.xisl_paths import path_to_xisl_library
 
 
 def load_xisl() -> CDLL:

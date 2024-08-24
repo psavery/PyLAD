@@ -1,4 +1,4 @@
-from pyxisl.api import init
+from pylad.api import init
 
 
 class Instrument:

@@ -2,7 +2,7 @@ import copy
 from pathlib import Path
 import subprocess
 
-from pyxisl.utils import xisl_paths
+from pylad.utils import xisl_paths
 
 # First, run ctypesgen on the library.
 # The paths for these are set by environment variables.

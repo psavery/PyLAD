@@ -1,6 +1,6 @@
 # This script is used to automatically generate error strings from the
 # error macros in Acq.h.
-# It was used to generate pyxisl/resources/xisl_errors.json
+# It was used to generate pylad/resources/xisl_errors.json
 
 import json
 

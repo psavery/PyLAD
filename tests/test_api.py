@@ -1,6 +1,6 @@
 import pytest
 
-from pyxisl import api
+from pylad import api
 
 
 def test_version():

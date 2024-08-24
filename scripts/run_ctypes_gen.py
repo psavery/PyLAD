@@ -1,7 +1,7 @@
 from pathlib import Path
 import subprocess
 
-from pyxisl.utils import xisl_paths
+from pylad.utils import xisl_paths
 
 header_path = xisl_paths.path_to_xisl_header()
 library_path = xisl_paths.path_to_xisl_library()

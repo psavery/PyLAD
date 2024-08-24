@@ -19,7 +19,7 @@ def wrap_xisl_library(lib):
     # causing a segmentation fault when calling the C functions.
 
     # To determine what a wrapper should look like, try using the `ctypesgen`
-    # library (see `pyxisl/scripts/generate_ctypes_wrappers`) and use whatever
+    # library (see `pylad/scripts/generate_ctypes_wrappers`) and use whatever
     # it generates as a start.
     BOOL = c_int
     INT = c_int

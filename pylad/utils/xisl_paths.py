@@ -7,7 +7,7 @@ from sys import platform
 # This should point to the root level of the compiled XISL path
 # On Linux, it should have 'include/Acq.h' and 'lib/libxisl.so' inside.
 # On Windows, it should have 'xisl.dll' and 'Acq.h' directly inside.
-xisl_path_env_name = 'PYXISL_XISL_PATH'
+xisl_path_env_name = 'PYLAD_XISL_PATH'
 
 if platform == 'linux':
     paths = {

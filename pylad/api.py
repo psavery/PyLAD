@@ -2,8 +2,8 @@
 
 import ctypes
 
-from pyxisl.utils.load_xisl import load_xisl
-from pyxisl.utils.xisl_errors import error_message
+from pylad.utils.load_xisl import load_xisl
+from pylad.utils.xisl_errors import error_message
 
 # This is the global XISL library that we will access
 _lib = load_xisl()
