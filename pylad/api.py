@@ -2,6 +2,10 @@
 
 import ctypes
 
+from pylad.generated.xisl_ctypes import (
+    CHwHeaderInfo,
+    CHwHeaderInfoEx,
+)
 from pylad.utils.load_xisl import load_xisl
 from pylad.utils.xisl_errors import error_message
 
@@ -12,14 +16,17 @@ _lib = load_xisl()
 class CheckReturnWrapper:
     def __getattribute__(self, name):
         f = getattr(_lib, name)
+
         def wrapped(*args, **kwargs):
             ret = f(*args, **kwargs)
             check_return(ret)
             return ret
+
         return wrapped
 
 
 lib = CheckReturnWrapper()
+
 
 def init():
     XIF_ALL = 0xFFFFFFFF
@@ -30,7 +37,7 @@ def cleanup():
     lib.Acquisition_Global_Cleanup()
 
 
-def enable_logging(b : bool = True):
+def enable_logging(b: bool = True):
     lib.Acquisition_EnableLogging(b)
 
 
@@ -63,15 +70,73 @@ def initialize_sensors() -> int:
     return num_sensors.value
 
 
-def get_next_sensor() -> int:
+def get_next_sensor() -> tuple[int, int]:
     desc_pos = ctypes.c_void_p()
     handle = ctypes.c_void_p()
-    lib.Acquisition_GetNextSensor(ctypes.pointer(desc_pos), ctypes.pointer(handle))
-    return handle.value
+    lib.Acquisition_GetNextSensor(
+        ctypes.pointer(desc_pos), ctypes.pointer(handle)
+    )
+    return (desc_pos.value, handle.value)
+
+
+def get_detector_header_info(
+    detector_handle: int,
+) -> tuple[CHwHeaderInfo, CHwHeaderInfoEx]:
+    info = CHwHeaderInfo()
+    info_ex = CHwHeaderInfoEx()
+    lib.Acquisition_GetHwHeaderInfoEx(
+        detector_handle, ctypes.pointer(info), ctypes.pointer(info_ex)
+    )
+
+    return (info, info_ex)
+
+
+def get_detector_comm_channel(detector_handle: int) -> tuple[int, int]:
+    channel_type = ctypes.c_uint()
+    channel = ctypes.c_int()
+    lib.Acquisition_GetCommChannel(
+        detector_handle, ctypes.pointer(channel_type), ctypes.pointer(channel)
+    )
+    return channel_type, channel
+
+
+def detector_abort(detector_handle: int):
+    lib.Acquisition_Abort(detector_handle)
 
 
 def set_camera_mode(detector_handle: int, dw_mode: int):
     lib.Acquisition_SetCameraMode(detector_handle, dw_mode)
+
+
+def set_camera_gain(detector_handle: int, gain: int):
+    lib.Acquisition_SetCameraGain(detector_handle, gain)
+
+
+def get_detector_configuration(detector_handle: int) -> dict:
+    c_uint = ctypes.c_uint
+    c_int = ctypes.c_int
+
+    # The order here must exactly match the order of arguments.
+    args = {
+        'frames': c_uint(),
+        'rows': c_uint(),
+        'columns': c_uint(),
+        'data_type': c_uint(),
+        'sort_flags': c_uint(),
+        'irq_enabled': c_int(),
+        'acq_type': c_uint(),
+        'system_id': c_uint(),
+        'sync_mode': c_uint(),
+        'access': c_uint(),
+    }
+
+    lib.Acquisition_GetConfiguration(
+        detector_handle,
+        # We must pass pointers to all of these
+        *[ctypes.pointer(x) for x in args.values()],
+    )
+
+    return {k: v.value for k, v in args.items()}
 
 
 def check_return(ret: int):
