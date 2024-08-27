@@ -21,6 +21,7 @@ else:
         'library': 'xisl.dll',
     }
 
+
 def path_to_xisl_header() -> Path:
     return xisl_path() / paths['header']
 

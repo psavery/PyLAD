@@ -78,7 +78,8 @@ with open(output_file, 'w') as wf:
                 line = next(rf)
                 wf.write(f'{indent}{libname}.{line.strip()}\n')
 
-def extract_undefined_names(output:str) -> list[str]:
+
+def extract_undefined_names(output: str) -> list[str]:
     ret = []
     identifier = 'undefined name'
     for line in output.split('\n'):
@@ -103,6 +104,7 @@ def read_list(line, rf) -> str:
         output_text += line
     output_text += '\n'
     return output_text
+
 
 # Here is how we are going to extract the identifiers we still need:
 # We are going to run flake8 on the script and extract all missing
