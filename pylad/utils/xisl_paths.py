@@ -18,7 +18,7 @@ else:
     # Assume windows
     paths = {
         'header': 'Acq.h',
-        'library': 'xisl.dll',
+        'library': 'xisl_64.dll',
     }
 
 
