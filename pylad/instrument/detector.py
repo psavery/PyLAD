@@ -1,4 +1,5 @@
 import logging
+from pathlib import Path
 
 from pylad import api
 from pylad import constants as ct
@@ -74,8 +75,6 @@ class Detector:
         self.enable_internal_trigger()
         self.exposure_time = 100
         self.gain = 4
-
-        self.start_acquisition()
 
     def __del__(self):
         # When this object is deleted, ensure that callbacks are deregistered
@@ -156,6 +155,12 @@ class Detector:
 
         # FIXME: Let's do whatever we need to do with the image
         img = self.frame_buffer[buffer_idx]  # noqa
+
+        # FIXME: we are temporarily writing these to disk
+        to_write_path = Path(f'./streamed_frames/{buffer_idx}.npy')
+        to_write_path.parent.mkdir(parents=True, exist_ok=True)
+        np.save(to_write_path, img)
+        logger.info(f'Wrote frame to: {two_write_path.resolve()}')
 
         self.increment_buffer_index()
         api.set_ready(self.handle, True)

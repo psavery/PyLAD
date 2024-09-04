@@ -1,6 +1,17 @@
 from enum import Enum
 
 
+class LogLevels(Enum):
+    TRACE = 0
+    DEBUG = 1
+    INFO = 2
+    WARN = 3
+    ERROR = 4
+    FATAL = 5
+    ALL = 6
+    NONE = 7
+
+
 class SequenceAcquisitionOptions(Enum):
     HIS_SEQ_TWO_BUFFERS = 0x1
     HIS_SEQ_ONE_BUFFER = 0x2

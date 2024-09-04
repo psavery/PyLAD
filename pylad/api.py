@@ -29,6 +29,18 @@ def enable_logging(b: bool = True):
     lib.Acquisition_EnableLogging(b)
 
 
+def set_log_output(path: str, write_to_console: bool = True):
+    lib.Acquisition_SetLogOutput(path, write_to_console)
+
+
+def set_log_level(log_level: ct.LogLevels):
+    lib.Acquisition_SetLogLevel(log_level.value)
+
+
+def toggle_log_performance(b: bool):
+    lib.Acquisition_TogglePerformanceLogging(b)
+
+
 def get_version() -> tuple[int, int, int, int]:
     major = ctypes.c_int()
     minor = ctypes.c_int()

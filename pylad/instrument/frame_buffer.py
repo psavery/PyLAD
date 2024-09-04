@@ -50,7 +50,9 @@ class FrameBufferAllocator:
             dtype=np.dtype(self.PIXEL_TYPE),
             count=self.num_pixels_in_buffer,
         ).reshape(
-            self.num_frames_in_buffer, self.rows, self.columns,
+            self.num_frames_in_buffer,
+            self.rows,
+            self.columns,
         )
 
 
