@@ -9,8 +9,6 @@ logger = logging.getLogger(__name__)
 
 class Instrument:
     def __init__(self):
-        api.init()
-
         self.setup_logging()
 
         # Initialize the detectors
@@ -19,7 +17,7 @@ class Instrument:
     def setup_logging(self):
         # These are the same settings Clemens used
         api.enable_logging()
-        api.set_log_output('log.txt', False)
+        api.set_log_output('log.txt', True)
         api.set_log_level(ct.LogLevels.TRACE)
 
     def initialize_detectors(self):
