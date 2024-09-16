@@ -1,4 +1,5 @@
 import logging
+import signal
 
 
 def setup_logger(log_level=logging.INFO):
@@ -24,3 +25,6 @@ def setup_logger(log_level=logging.INFO):
 
 # Set up the logger by default
 setup_logger(logging.DEBUG)
+
+# Kill the program when ctrl-c is used
+signal.signal(signal.SIGINT, signal.SIG_DFL)
