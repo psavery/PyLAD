@@ -1,6 +1,8 @@
 import logging
 from pathlib import Path
 
+import numpy as np
+
 from pylad import api
 from pylad import constants as ct
 from pylad.instrument.frame_buffer import FrameBufferAllocator
@@ -113,10 +115,10 @@ class Detector:
         self._gain = v
 
     def enable_external_trigger(self):
-        self._set_frame_sync_mode(ct.Triggers.HIS_SYNCMODE_EXTERNAL_TRIGGER)
+        self.set_frame_sync_mode(ct.Triggers.HIS_SYNCMODE_EXTERNAL_TRIGGER)
 
     def enable_internal_trigger(self):
-        self._set_frame_sync_mode(ct.Triggers.HIS_SYNCMODE_INTERNAL_TIMER)
+        self.set_frame_sync_mode(ct.Triggers.HIS_SYNCMODE_INTERNAL_TIMER)
 
     def set_frame_sync_mode(self, mode: ct.Triggers):
         api.set_frame_sync_mode(self.handle, mode)
@@ -149,9 +151,9 @@ class Detector:
     def _frame_callback(self):
         buffer_idx = self._current_buffer_idx
         logger.info(f'Frame callback with buffer index: {buffer_idx}')
-        info, info_ex = api.get_latest_frame_header(self.handle)
+        # info, info_ex = api.get_latest_frame_header(self.handle)
 
-        act_frame, sec_frame = api.get_act_frame(self.handle)
+        # act_frame, sec_frame = api.get_act_frame(self.handle)
 
         # FIXME: Let's do whatever we need to do with the image
         img = self.frame_buffer[buffer_idx]  # noqa
@@ -160,7 +162,7 @@ class Detector:
         to_write_path = Path(f'./streamed_frames/{buffer_idx}.npy')
         to_write_path.parent.mkdir(parents=True, exist_ok=True)
         np.save(to_write_path, img)
-        logger.info(f'Wrote frame to: {two_write_path.resolve()}')
+        logger.info(f'Wrote frame to: {to_write_path.resolve()}')
 
         self.increment_buffer_index()
         api.set_ready(self.handle, True)

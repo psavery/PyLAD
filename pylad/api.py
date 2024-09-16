@@ -178,9 +178,14 @@ def define_destination_buffers(
     num_rows: int,
     num_columns: int,
 ):
+    # We need to manually convert to uint16*, because ctypes gets confused
+    # about the type conversion here.
+    pointer_type = ctypes.POINTER(ctypes.c_uint16)
+    frame_buffer_pointer_p = ctypes.cast(frame_buffer_pointer, pointer_type)
+
     lib.Acquisition_DefineDestBuffers(
         detector_handle,
-        frame_buffer_pointer,
+        frame_buffer_pointer_p,
         num_frames_in_buffer,
         num_rows,
         num_columns,

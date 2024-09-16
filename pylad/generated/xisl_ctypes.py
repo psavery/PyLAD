@@ -460,7 +460,7 @@ def ord_if_char(value):
 
 # Import ctypes types manually (update if needed)
 from ctypes import (
-    CFUNCTYPE,
+    WINFUNCTYPE,
     c_char,
     c_double,
     c_int,
@@ -473,6 +473,7 @@ from ctypes import (
     Structure,
 )
 
+CFUNCTYPE=WINFUNCTYPE
 
 def add_xisl_ctypes(lib):
     # Define a few types manually (update if needed)
@@ -512,8 +513,8 @@ def add_xisl_ctypes(lib):
         HWND,
         UINT,
         UINT,
-        CFUNCTYPE(UNCHECKED(None), HACQDESC),
-        CFUNCTYPE(UNCHECKED(None), HACQDESC),
+        CFUNCTYPE(None, ctypes.c_void_p),
+        ctypes.c_void_p,
     ]
     lib.Acquisition_SetCallbacksAndMessages.restype = UINT
 
