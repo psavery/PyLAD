@@ -158,6 +158,14 @@ class Detector:
         # FIXME: Let's do whatever we need to do with the image
         img = self.frame_buffer[buffer_idx]  # noqa
 
+        logger.info(
+            'Frame info:\n'
+            f'  max    {np.max(img)}\n'
+            f'  mean   {np.mean(img)}\n'
+            f'  median {np.median(img)}\n'
+            f'  stdev  {np.std(img)}\n'
+        )
+
         # FIXME: we are temporarily writing these to disk
         to_write_path = Path(f'./streamed_frames/{buffer_idx}.npy')
         to_write_path.parent.mkdir(parents=True, exist_ok=True)
