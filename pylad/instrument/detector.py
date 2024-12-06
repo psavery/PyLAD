@@ -2,6 +2,7 @@ import logging
 from pathlib import Path
 
 import numpy as np
+from PIL import Image
 
 from pylad import api
 from pylad import constants as ct
@@ -11,8 +12,17 @@ logger = logging.getLogger(__name__)
 
 
 class Detector:
-    def __init__(self, detector_handle: int):
+    def __init__(self, detector_handle: int, name: str, run_name: str = '',
+                 save_files_path: Path | None = None):
         self.handle = detector_handle
+        self.name = name
+        self.run_name = run_name
+
+        if save_files_path is None:
+            save_files_path = Path('.').resolve()
+
+        # The path to save files
+        self.save_files_path = save_files_path
 
         # We are following along the same kinds of calls that happened
         # in Clemens' code.
@@ -74,9 +84,25 @@ class Detector:
         # Set some default values for exposure time, gain, etc.
         # These don't all have getters in the API. Several of them
         # only have setters, so we must cache the setting internally.
-        self.enable_internal_trigger()
+
+        # Exposure time is only used for internal trigger mode
         self.exposure_time = 100
         self.gain = 4
+
+        # We default to external trigger mode, since that is what will
+        # be most commonly used
+        self.enable_external_trigger()
+
+        # These settings are used in external trigger mode
+        # "skip_frames" is the number of frames to skip (usually 1)
+        # "num_background_frames" is how many frames will be background (after
+        # the "skip_frames" frames have been skipped). It is assumed that the
+        # next frame after the last background frame will contain data.
+        # "background_frames" is the list of background frames we have acquired
+        self.skip_frames = 1
+        self.num_background_frames = 0
+        self.background_frames: list[np.ndarray] = []
+        self._num_frames_acquired = 0
 
     def __del__(self):
         # When this object is deleted, ensure that callbacks are deregistered
@@ -127,7 +153,20 @@ class Detector:
     def get_trigger_mode(self) -> ct.Triggers:
         return self._frame_sync_mode
 
+    @property
+    def is_external_trigger(self):
+        mode = ct.Triggers.HIS_SYNCMODE_EXTERNAL_TRIGGER
+        return self.get_trigger_mode() == mode
+
+    @property
+    def is_internal_trigger(self):
+        mode = ct.Triggers.HIS_SYNCMODE_EXTERNAL_TRIGGER
+        return self.get_trigger_mode() == mode
+
     def start_acquisition(self):
+        self._num_frames_acquired = 0
+        self.background_frames.clear()
+
         self.start_continuous_acquisition()
 
     def start_continuous_acquisition(self):
@@ -158,6 +197,15 @@ class Detector:
         # FIXME: Let's do whatever we need to do with the image
         img = self.frame_buffer[buffer_idx]  # noqa
 
+        self._handle_frame(img)
+
+        self._num_frames_acquired += 1
+        self.increment_buffer_index()
+        api.set_ready(self.handle, True)
+
+    def _handle_frame(self, img: np.ndarray):
+        frame_idx = self._num_frames_acquired
+
         logger.info(
             'Frame info:\n'
             f'  max    {np.max(img)}\n'
@@ -165,12 +213,69 @@ class Detector:
             f'  median {np.median(img)}\n'
             f'  stdev  {np.std(img)}\n'
         )
+        if self.is_internal_trigger:
+            # Just write out the frames to disk as they come in...
+            # Always use a unique name
+            counter = 1
+            path = self.data_frame_save_path(str(counter))
+            while path.exists():
+                counter += 1
+                path = self.data_frame_save_path(str(counter))
+            self.save_data_frame(img, str(counter))
+            return
+        elif not self.is_external_trigger:
+            raise NotImplementedError(
+                f'Unexpected trigger mode: {self.get_trigger_mode()}'
+            )
 
-        # FIXME: we are temporarily writing these to disk
-        to_write_path = Path(f'./streamed_frames/{buffer_idx}.npy')
-        to_write_path.parent.mkdir(parents=True, exist_ok=True)
-        np.save(to_write_path, img)
-        logger.info(f'Wrote frame to: {to_write_path.resolve()}')
+        # This is external trigger mode. Proceed.
+        if frame_idx < self.skip_frames:
+            logger.info('Encountered skip frame. Skipping...')
+            return
 
-        self.increment_buffer_index()
-        api.set_ready(self.handle, True)
+        if frame_idx - self.skip_frames < self.num_background_frames:
+            logger.info('Encountered background frame. Storing...')
+            self.background_frames.append(img)
+            return
+
+        if frame_idx == self.skip_frames + self.num_background_frames:
+            # This must be the data frame
+            # Write out the data, and then write out the median
+            # of the background frames.
+            logger.info('Encountered data frame. Saving...')
+            self.save_data_frame(img)
+            self.save_background()
+
+            # Free up some memory
+            self.background_frames.clear()
+            return
+
+        # Making it to this point is unexpected behavior. We must
+        # have collected more frames than the number of data frames.
+        logger.critical(f'Received unexpected frame: {frame_idx}. Dropping.')
+
+    @property
+    def file_prefix(self):
+        return f'{self.run_name}_{self.name}'
+
+    def data_frame_save_path(self, suffix: str = '') -> Path:
+        filename = f'{self.file_prefix}_data{suffix}.tiff'
+        return Path(self.save_files_path).resolve() / filename
+
+    def save_data_frame(self, img: np.ndarray, suffix: str = ''):
+        save_path = self.data_frame_save_path(suffix)
+        save_path.parent.mkdir(parents=True, exist_ok=True)
+        Image.fromarray(img).save(save_path, 'TIFF')
+        logger.info(f'Saved data to: {save_path}')
+
+    def save_background(self):
+        background = np.median(self.background_frames, axis=0)
+
+        num_frames = len(self.background_frames)
+        prefix = self.file_prefix
+        filename = f'{prefix}_background_median_of_{num_frames}_frames.tiff'
+        save_path = Path(self.save_files_path).resolve() / filename
+        save_path.parent.mkdir(parents=True, exist_ok=True)
+
+        Image.fromarray(background).save(save_path, 'TIFF')
+        logger.info(f'Saved background to: {save_path}')
