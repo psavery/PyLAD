@@ -30,8 +30,12 @@ class Instrument:
         # For "external trigger" mode, set the number of frames we will
         # skip, as well as the number of background frames before the
         # frame that contains the data.
+
+        # FIXME: don't show this to users. Keep it at 1.
         self.set_skip_frames(1)
         self.set_num_background_frames(10)
+
+        # FIXME: set how many frames to collect
 
     def setup_logging(self):
         # These are the same settings Clemens used

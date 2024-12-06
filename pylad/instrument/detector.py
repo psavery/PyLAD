@@ -190,7 +190,7 @@ class Detector:
 
     def _frame_callback(self):
         buffer_idx = self._current_buffer_idx
-        logger.info(f'Frame callback with buffer index: {buffer_idx}')
+        logger.info(f'\nFrame callback with buffer index: {buffer_idx}')
         # info, info_ex = api.get_latest_frame_header(self.handle)
 
         # act_frame, sec_frame = api.get_act_frame(self.handle)
@@ -246,6 +246,7 @@ class Detector:
             logger.info('Encountered data frame. Saving...')
             self.save_data_frame(img)
             self.save_background()
+            self.stop_acquisition()
 
             # Free up some memory
             self.background_frames.clear()
