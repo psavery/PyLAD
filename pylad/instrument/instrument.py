@@ -10,7 +10,8 @@ logger = logging.getLogger(__name__)
 
 class Instrument:
     def __init__(self, run_name: str = 'Run1',
-                 save_files_path: Path | None = None):
+                 save_files_path: Path | None = None,
+                 detector_prefix: str = 'varex'):
         self.setup_logging()
 
         self.detectors = {}
@@ -21,6 +22,7 @@ class Instrument:
             save_files_path = Path('.') / run_name
 
         self.save_files_path = save_files_path
+        self.detector_prefix = detector_prefix
 
         # Initialize the detectors
         self.initialize_detectors()
@@ -51,7 +53,7 @@ class Instrument:
             logger.info(f'Setting up detector: {pos}')
             self.detectors[pos] = Detector(
                 handle,
-                name=pos,
+                name=f'{self.detector_prefix}{i + 1}',
                 run_name=self.run_name,
                 save_files_path=self.save_files_path,
             )
