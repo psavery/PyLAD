@@ -161,7 +161,7 @@ class Detector:
 
     @property
     def is_internal_trigger(self):
-        mode = ct.Triggers.HIS_SYNCMODE_EXTERNAL_TRIGGER
+        mode = ct.Triggers.HIS_SYNCMODE_INTERNAL_TIMER
         return self.get_trigger_mode() == mode
 
     def start_acquisition(self):
