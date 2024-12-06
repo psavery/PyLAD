@@ -86,7 +86,7 @@ class Detector:
         # only have setters, so we must cache the setting internally.
 
         # Exposure time is only used for internal trigger mode
-        self.exposure_time = 100
+        self._exposure_time = 100
         self.gain = 4
 
         # We default to external trigger mode, since that is what will
@@ -145,6 +145,7 @@ class Detector:
 
     def enable_internal_trigger(self):
         self.set_frame_sync_mode(ct.Triggers.HIS_SYNCMODE_INTERNAL_TIMER)
+        api.set_exposure_time(self.handle, self._exposure_time)
 
     def set_frame_sync_mode(self, mode: ct.Triggers):
         api.set_frame_sync_mode(self.handle, mode)

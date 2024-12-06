@@ -12,6 +12,9 @@ class Instrument:
     def __init__(self, run_name: str = 'Run1',
                  save_files_path: Path | None = None):
         self.setup_logging()
+
+        self.detectors = {}
+
         self.run_name = run_name
 
         if save_files_path is None:
