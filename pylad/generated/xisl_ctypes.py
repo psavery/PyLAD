@@ -4,6 +4,7 @@
 # will be performed when we call them via ctypes). As long as we are certain
 # that the types match, we are actually able to skip using this script.
 import ctypes
+import platform
 import sys
 
 _int_types = (ctypes.c_int16, ctypes.c_int32)
@@ -460,7 +461,6 @@ def ord_if_char(value):
 
 # Import ctypes types manually (update if needed)
 from ctypes import (
-    WINFUNCTYPE,
     c_char,
     c_double,
     c_int,
@@ -473,7 +473,13 @@ from ctypes import (
     Structure,
 )
 
-CFUNCTYPE=WINFUNCTYPE
+if platform.system() == 'Windows':
+    # On Windows only, stdcall is used for callbacks in XISL, so we must
+    # use the WINFUNCTYPE callback decorator instead
+    from ctypes import WINFUNCTYPE as FUNC_TYPE
+else:
+    # Everything else uses cdecl
+    from ctypes import CFUNCTYPE as FUNC_TYPE
 
 def add_xisl_ctypes(lib):
     # Define a few types manually (update if needed)
@@ -513,7 +519,7 @@ def add_xisl_ctypes(lib):
         HWND,
         UINT,
         UINT,
-        CFUNCTYPE(None, ctypes.c_void_p),
+        FUNC_TYPE(None, ctypes.c_void_p),
         ctypes.c_void_p,
     ]
     lib.Acquisition_SetCallbacksAndMessages.restype = UINT
@@ -2140,7 +2146,7 @@ enum_XIS_Event = c_int
 XIS_Event = enum_XIS_Event
 enum_XIS_GrabberTriggerRoute = c_int
 XIS_GrabberTriggerRoute = enum_XIS_GrabberTriggerRoute
-XIS_EventCallback = CFUNCTYPE(
+XIS_EventCallback = FUNC_TYPE(
     UNCHECKED(None), XIS_Event, UINT, UINT, POINTER(None), POINTER(None)
 )
 enum_XIS_Init_Flags = c_int
