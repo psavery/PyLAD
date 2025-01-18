@@ -192,6 +192,15 @@ def define_destination_buffers(
     )
 
 
+def set_binning_mode(detector_handle: int, mode: int):
+    # You have to look in the detector's manual to see what types
+    # of binning the different modes represent...
+    lib.Acquisition_SetCameraBinningMode(
+        detector_handle,
+        mode,
+    )
+
+
 def reset_frame_count(detector_handle: int):
     lib.Acquisition_ResetFrameCnt(detector_handle)
 
