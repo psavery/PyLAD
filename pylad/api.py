@@ -70,8 +70,8 @@ def initialize_sensors() -> int:
     return num_sensors.value
 
 
-def get_next_sensor() -> tuple[int | None, int | None]:
-    desc_pos = ctypes.c_void_p()
+def get_next_sensor(last_pos: int) -> tuple[int | None, int | None]:
+    desc_pos = ctypes.c_uint(last_pos)
     handle = ctypes.c_void_p()
     lib.Acquisition_GetNextSensor(ctypes.byref(desc_pos), ctypes.byref(handle))
     return (desc_pos.value, handle.value)

@@ -51,8 +51,9 @@ class Instrument:
 
         logger.info(f'Found {num_detectors} detectors')
 
+        pos = 0
         for i in range(num_detectors):
-            pos, handle = api.get_next_sensor()
+            pos, handle = api.get_next_sensor(pos)
             # pos was `None` for the single detector setup
             logger.info(f'Setting up detector: {pos}')
             self.detectors[pos] = Detector(
