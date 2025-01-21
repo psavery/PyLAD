@@ -102,6 +102,9 @@ class Detector:
         self.skip_frames = 1
         self.num_background_frames = 0
         self.background_frames: list[np.ndarray] = []
+
+        self.num_data_frames = 1
+        self.data_frames: list[np.ndarray] = []
         self._num_frames_acquired = 0
 
     def __del__(self):
@@ -167,6 +170,7 @@ class Detector:
     def start_acquisition(self):
         self._num_frames_acquired = 0
         self.background_frames.clear()
+        self.data_frames.clear()
 
         self.start_continuous_acquisition()
 
@@ -190,7 +194,9 @@ class Detector:
 
     def _frame_callback(self):
         buffer_idx = self._current_buffer_idx
-        logger.info(f'\nFrame callback with buffer index: {buffer_idx}')
+        logger.info(
+            f'\n{self.name}: Frame callback with buffer index: {buffer_idx}'
+        )
         # info, info_ex = api.get_latest_frame_header(self.handle)
 
         # act_frame, sec_frame = api.get_act_frame(self.handle)
@@ -208,7 +214,7 @@ class Detector:
         frame_idx = self._num_frames_acquired
 
         logger.info(
-            'Frame info:\n'
+            f'{self.name}: Frame info:\n'
             f'  max    {np.max(img)}\n'
             f'  mean   {np.mean(img)}\n'
             f'  median {np.median(img)}\n'
@@ -221,8 +227,8 @@ class Detector:
             path = self.data_frame_save_path(str(counter))
             while path.exists():
                 counter += 1
-                path = self.data_frame_save_path(str(counter))
-            self.save_data_frame(img, str(counter))
+                path = self.frame_save_path(str(counter))
+            self.save_frame(img, str(counter))
             return
         elif not self.is_external_trigger:
             raise NotImplementedError(
@@ -231,44 +237,59 @@ class Detector:
 
         # This is external trigger mode. Proceed.
         if frame_idx < self.skip_frames:
-            logger.info('Encountered skip frame. Skipping...')
+            logger.info(f'{self.name}: Encountered skip frame. Skipping...')
             return
 
         if frame_idx - self.skip_frames < self.num_background_frames:
-            logger.info('Encountered background frame. Storing...')
+            logger.info(
+                f'{self.name}: Encountered background frame. Storing...'
+            )
             self.background_frames.append(img)
             return
 
-        if frame_idx == self.skip_frames + self.num_background_frames:
-            # This must be the data frame
-            # Write out the data, and then write out the median
-            # of the background frames.
-            logger.info('Encountered data frame. Saving...')
-            self.save_data_frame(img)
-            self.save_background()
-            self.stop_acquisition()
+        if (
+            frame_idx - self.skip_frames - self.num_background_frames <
+            self.num_data_frames
+        ):
+            logger.info(f'{self.name}: Encountered data frame. Storing...')
+            self.data_frames.append(img)
 
-            # Free up some memory
-            self.background_frames.clear()
-            return
+            if (
+                frame_idx - self.skip_frames - self.num_background_frames ==
+                self.num_data_frames - 1
+            ):
+                logger.info(
+                    f'{self.name}: Received final data frame. '
+                    'Writing and exiting...'
+                )
+                self.save_background()
+                self.save_data_frames()
+                self.stop_acquisition()
+
+                # Free up some memory
+                self.background_frames.clear()
+                self.data_frames.clear()
+                return
 
         # Making it to this point is unexpected behavior. We must
         # have collected more frames than the number of data frames.
-        logger.critical(f'Received unexpected frame: {frame_idx}. Dropping.')
+        logger.critical(
+            f'{self.name}: Received unexpected frame: {frame_idx}. Dropping.'
+        )
 
     @property
     def file_prefix(self):
         return f'{self.run_name}_{self.name}'
 
-    def data_frame_save_path(self, suffix: str = '') -> Path:
-        filename = f'{self.file_prefix}_data{suffix}.tiff'
+    def frame_save_path(self, suffix: str = '') -> Path:
+        filename = f'{self.file_prefix}_frame{suffix}.tiff'
         return Path(self.save_files_path).resolve() / filename
 
-    def save_data_frame(self, img: np.ndarray, suffix: str = ''):
-        save_path = self.data_frame_save_path(suffix)
+    def save_frame(self, img: np.ndarray, suffix: str = ''):
+        save_path = self.frame_save_path(suffix)
         save_path.parent.mkdir(parents=True, exist_ok=True)
         Image.fromarray(img).save(save_path, 'TIFF')
-        logger.info(f'Saved data to: {save_path}')
+        logger.info(f'{self.name}: Saved data to: {save_path}')
 
     def save_background(self):
         background = np.median(self.background_frames, axis=0)
@@ -280,4 +301,17 @@ class Detector:
         save_path.parent.mkdir(parents=True, exist_ok=True)
 
         Image.fromarray(background).save(save_path, 'TIFF')
-        logger.info(f'Saved background to: {save_path}')
+        logger.info(f'{self.name}: Saved background to: {save_path}')
+
+    def save_data_frames(self):
+        save_dir = Path(self.save_files_path).resolve()
+        save_dir.mkdir(parents=True, exist_ok=True)
+
+        prefix = self.file_prefix
+
+        for i in range(len(self.data_frames)):
+            img = self.data_frames[i]
+            filename = f'{prefix}_data{i + 1}.tiff'
+            save_path = save_dir / filename
+            Image.fromarray(img).save(save_path, 'TIFF')
+            logger.info(f'{self.name}: Saved data to: {save_path}')

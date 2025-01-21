@@ -31,11 +31,9 @@ class Instrument:
         # skip, as well as the number of background frames before the
         # frame that contains the data.
 
-        # FIXME: don't show this to users. Keep it at 1.
         self.set_skip_frames(1)
         self.set_num_background_frames(10)
-
-        # FIXME: set how many frames to collect
+        self.set_num_data_frames(1)
 
     def setup_logging(self):
         # These are the same settings Clemens used
@@ -96,6 +94,10 @@ class Instrument:
     def set_num_background_frames(self, num_frames: int):
         for det in self.detectors.values():
             det.num_background_frames = num_frames
+
+    def set_num_data_frames(self, num_frames: int):
+        for det in self.detectors.values():
+            det.num_data_frames = num_frames
 
     @property
     def run_name(self) -> str:
