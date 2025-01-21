@@ -99,6 +99,14 @@ class Instrument:
         for det in self.detectors.values():
             det.num_data_frames = num_frames
 
+    def set_statistics_only_mode(self, b: bool):
+        for det in self.detectors.values():
+            det.statistics_only_mode = b
+
+    def set_statistics_only_mode_num_frames(self, num_frames: int):
+        for det in self.detectors.values():
+            det.statistics_only_mode_num_frames = num_frames
+
     @property
     def run_name(self) -> str:
         return self._run_name

@@ -1,5 +1,6 @@
 import logging
 from pathlib import Path
+import time
 
 import numpy as np
 from PIL import Image
@@ -93,6 +94,11 @@ class Detector:
         # be most commonly used
         self.enable_external_trigger()
 
+        # This just collects statistics to save
+        self.statistics_only_mode = False
+        self.statistics_only_mode_num_frames = 1000
+        self.frame_statistics = []
+
         # These settings are used in external trigger mode
         # "skip_frames" is the number of frames to skip (usually 1)
         # "num_background_frames" is how many frames will be background (after
@@ -171,6 +177,7 @@ class Detector:
         self._num_frames_acquired = 0
         self.background_frames.clear()
         self.data_frames.clear()
+        self.frame_statistics.clear()
 
         self.start_continuous_acquisition()
 
@@ -213,13 +220,33 @@ class Detector:
     def _handle_frame(self, img: np.ndarray):
         frame_idx = self._num_frames_acquired
 
-        logger.info(
-            f'{self.name}: Frame info:\n'
-            f'  max    {np.max(img)}\n'
-            f'  mean   {np.mean(img)}\n'
-            f'  median {np.median(img)}\n'
-            f'  stdev  {np.std(img)}\n'
+        stats = {
+            'collection_time': time.time(),
+            'max': img.max(),
+            'min': img.min(),
+            'mean': img.mean(),
+            'median': np.median(img),
+            'stdev': np.std(img),
+        }
+
+        msg = (
+            f'{self.name}: Frame info:\n' +
+            '\n'.join([
+                f'  {k:<6s} {stats[k]}' for k in stats
+            ])
         )
+        logger.info(msg)
+        if self.statistics_only_mode:
+            self.frame_statistics.append(stats)
+            if (
+                len(self.frame_statistics) ==
+                self.statistics_only_mode_num_frames
+            ):
+                self.write_statistics()
+                self.stop_acquisition()
+
+            return
+
         if self.is_internal_trigger:
             # Just write out the frames to disk as they come in...
             # Always use a unique name
@@ -292,6 +319,10 @@ class Detector:
         logger.info(f'{self.name}: Saved data to: {save_path}')
 
     def save_background(self):
+        if not self.background_frames:
+            # Nothing to do...
+            return
+
         background = np.median(self.background_frames, axis=0)
 
         num_frames = len(self.background_frames)
@@ -315,3 +346,22 @@ class Detector:
             save_path = save_dir / filename
             Image.fromarray(img).save(save_path, 'TIFF')
             logger.info(f'{self.name}: Saved data to: {save_path}')
+
+    def write_statistics(self):
+        if not self.frame_statistics:
+            # Nothing to do
+            return
+
+        save_dir = Path(self.save_files_path).resolve()
+        save_dir.mkdir(parents=True, exist_ok=True)
+
+        prefix = self.file_prefix
+
+        stat_keys = list(self.frame_statistics[0])
+        for key in stat_keys:
+            values = np.array([x[key] for x in self.frame_statistics])
+
+            filename = f'{prefix}_{key}_stats.npy'
+            save_path = save_dir / filename
+
+            np.save(save_path, values)
