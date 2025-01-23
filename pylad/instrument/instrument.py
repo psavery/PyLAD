@@ -14,7 +14,7 @@ class Instrument:
                  detector_prefix: str = 'varex'):
         self.setup_logging()
 
-        self.detectors = {}
+        self.detectors: dict[str, Detector] = {}
 
         self.run_name = run_name
 
@@ -34,6 +34,9 @@ class Instrument:
         self.set_skip_frames(1)
         self.set_num_background_frames(10)
         self.set_num_data_frames(1)
+        self.set_num_post_shot_background_frames(0)
+
+        self.set_perform_background_median(True)
 
     def setup_logging(self):
         # These are the same settings Clemens used
@@ -63,13 +66,17 @@ class Instrument:
 
         logger.info(f'Successfully initialized {num_detectors} detectors')
 
+    @property
+    def acquisition_finished(self) -> bool:
+        return all(x.acquisition_finished for x in self.detectors.values())
+
     def set_exposure_time(self, milliseconds: int):
         for det in self.detectors.values():
-            det.set_exposure_time(milliseconds)
+            det.exposure_time = milliseconds
 
     def set_gain(self, gain: int):
         for det in self.detectors.values():
-            det.set_gain(gain)
+            det.gain = gain
 
     def enable_internal_trigger(self):
         for det in self.detectors.values():
@@ -99,6 +106,10 @@ class Instrument:
         for det in self.detectors.values():
             det.num_data_frames = num_frames
 
+    def set_num_post_shot_background_frames(self, num_frames: int):
+        for det in self.detectors.values():
+            det.num_post_shot_background_frames = num_frames
+
     def set_statistics_only_mode(self, b: bool):
         for det in self.detectors.values():
             det.statistics_only_mode = b
@@ -106,6 +117,10 @@ class Instrument:
     def set_statistics_only_mode_num_frames(self, num_frames: int):
         for det in self.detectors.values():
             det.statistics_only_mode_num_frames = num_frames
+
+    def set_perform_background_median(self, b: bool):
+        for det in self.detectors.values():
+            det.perform_background_median = b
 
     @property
     def run_name(self) -> str:
@@ -126,3 +141,17 @@ class Instrument:
         self._save_files_path = Path(path)
         for det in self.detectors.values():
             det.save_files_path = self._save_files_path
+
+    @property
+    def last_saved_data_frame_paths(self) -> dict[str, Path | None]:
+        return {
+            k: det.last_saved_data_frame_path
+            for k, det in self.detectors.items()
+        }
+
+    @property
+    def saved_median_dark_subtraction_paths(self) -> dict[str, Path | None]:
+        return {
+            k: det.saved_median_dark_subtraction_path
+            for k, det in self.detectors.items()
+        }

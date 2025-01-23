@@ -97,21 +97,33 @@ class Detector:
         # This just collects statistics to save
         self.statistics_only_mode = False
         self.statistics_only_mode_num_frames = 1000
-        self.frame_statistics = []
+        self.frame_statistics: list[dict[str, np.ndarray]] = []
 
         # These settings are used in external trigger mode
         # "skip_frames" is the number of frames to skip (usually 1)
         # "num_background_frames" is how many frames will be background (after
-        # the "skip_frames" frames have been skipped). It is assumed that the
-        # next frame after the last background frame will contain data.
-        # "background_frames" is the list of background frames we have acquired
+        # the "skip_frames" frames have been skipped).
+        # "num_data_frames" is how many data frames will be taken (after the
+        # background frames)
+        # "num_post_shot_background_frames" is how many background frames will
+        # be taken (after the data frames)
         self.skip_frames = 1
         self.num_background_frames = 0
-        self.background_frames: list[np.ndarray] = []
-
         self.num_data_frames = 1
-        self.data_frames: list[np.ndarray] = []
+        self.num_post_shot_background_frames = 0
+
+        # "background_frames" is the list of background frames we have acquired
+        # It is only used if `self.perform_background_median` is `True`
+        self.background_frames: list[np.ndarray] = []
+        self.perform_background_median = True
+        self._last_saved_data_frame_path: Path | None = None
+        self._saved_median_dark_subtraction_path: Path | None = None
+
         self._num_frames_acquired = 0
+        self.acquisition_finished = False
+
+        self._last_frame_callback_time = None
+        self._acquisition_start_time = None
 
     def __del__(self):
         # When this object is deleted, ensure that callbacks are deregistered
@@ -154,10 +166,13 @@ class Detector:
 
     def enable_internal_trigger(self):
         self.set_frame_sync_mode(ct.Triggers.HIS_SYNCMODE_INTERNAL_TIMER)
-        api.set_exposure_time(self.handle, self._exposure_time)
+
+    def activate_frame_sync_mode(self):
+        api.set_frame_sync_mode(self.handle, self._frame_sync_mode)
+        if self.is_internal_trigger:
+            api.set_exposure_time(self.handle, self._exposure_time)
 
     def set_frame_sync_mode(self, mode: ct.Triggers):
-        api.set_frame_sync_mode(self.handle, mode)
         self._frame_sync_mode = mode
 
     def get_trigger_mode(self) -> ct.Triggers:
@@ -175,11 +190,17 @@ class Detector:
 
     def start_acquisition(self):
         self._num_frames_acquired = 0
+        self._last_frame_callback_time = None
+
         self.background_frames.clear()
-        self.data_frames.clear()
         self.frame_statistics.clear()
 
+        # Only activate the frame sync mode immediately before acquisition,
+        # because otherwise the detector may enter into idle mode.
+        self.activate_frame_sync_mode()
+
         self.start_continuous_acquisition()
+        self._acquisition_start_time = time.time()
 
     def start_continuous_acquisition(self):
         # Begin a continuous acquisition stream, where the frames in
@@ -193,6 +214,7 @@ class Detector:
 
     def stop_acquisition(self):
         api.acquisition_abort(self.handle)
+        self.acquisition_finished = True
 
     def increment_buffer_index(self):
         self._current_buffer_idx += 1
@@ -200,6 +222,22 @@ class Detector:
             self._current_buffer_idx = 0
 
     def _frame_callback(self):
+        # First record the time taken to receive this callback
+        prev = getattr(self, '_last_frame_callback_time', None)
+        self._last_frame_callback_time = time.time()
+        time_taken = (
+            self._last_frame_callback_time - prev
+            if prev is not None else self._acquisition_start_time
+        )
+
+        if prev is not None:
+            logger.info(f'{self.name}: Time since last frame: {time_taken}')
+        else:
+            logger.info(
+                f'{self.name}: Frame received after start acquisition: '
+                f'{time_taken}'
+            )
+
         buffer_idx = self._current_buffer_idx
         logger.info(
             f'\n{self.name}: Frame callback with buffer index: {buffer_idx}'
@@ -208,14 +246,23 @@ class Detector:
 
         # act_frame, sec_frame = api.get_act_frame(self.handle)
 
-        # FIXME: Let's do whatever we need to do with the image
         img = self.frame_buffer[buffer_idx]  # noqa
 
         self._handle_frame(img)
 
         self._num_frames_acquired += 1
         self.increment_buffer_index()
+
         api.set_ready(self.handle, True)
+
+        frame_handling_time = time.time() - self._last_frame_callback_time
+        logger.info(f'{self.name}: Frame handling time: {frame_handling_time}')
+        if frame_handling_time > 0.075:
+            logger.critical(
+                f'{self.name}: WARNING, frame handling time '
+                f'({frame_handling_time}) exceeded 75 milliseconds. '
+                'A trigger could have been missed!'
+            )
 
     def _handle_frame(self, img: np.ndarray):
         frame_idx = self._num_frames_acquired
@@ -225,17 +272,24 @@ class Detector:
             'max': img.max(),
             'min': img.min(),
             'mean': img.mean(),
-            'median': np.median(img),
-            'stdev': np.std(img),
         }
+        if self.statistics_only_mode:
+            # Only record median and stdev in statistics-only mode,
+            # since they taken time to record.
+            stats = {
+                **stats,
+                'median': np.median(img),
+                'stdev': np.std(img),
+            }
 
         msg = (
-            f'{self.name}: Frame info:\n' +
-            '\n'.join([
-                f'  {k:<6s} {stats[k]}' for k in stats
+            f'{self.name}: Frame info:\n  ' +
+            '  \n'.join([
+                f'{k:<6s} {stats[k]}' for k in stats
             ])
         )
         logger.info(msg)
+
         if self.statistics_only_mode:
             self.frame_statistics.append(stats)
             if (
@@ -251,11 +305,11 @@ class Detector:
             # Just write out the frames to disk as they come in...
             # Always use a unique name
             counter = 1
-            path = self.data_frame_save_path(str(counter))
+            path = self.internal_trigger_save_frame_path(str(counter))
             while path.exists():
                 counter += 1
-                path = self.frame_save_path(str(counter))
-            self.save_frame(img, str(counter))
+                path = self.internal_trigger_save_frame_path(str(counter))
+            self.save_internal_trigger_frame(img, str(counter))
             return
         elif not self.is_external_trigger:
             raise NotImplementedError(
@@ -267,36 +321,54 @@ class Detector:
             logger.info(f'{self.name}: Encountered skip frame. Skipping...')
             return
 
-        if frame_idx - self.skip_frames < self.num_background_frames:
+        background_frame_idx = frame_idx - self.skip_frames
+        if background_frame_idx < self.num_background_frames:
             logger.info(
                 f'{self.name}: Encountered background frame. Storing...'
             )
-            self.background_frames.append(img)
-            return
-
-        if (
-            frame_idx - self.skip_frames - self.num_background_frames <
-            self.num_data_frames
-        ):
-            logger.info(f'{self.name}: Encountered data frame. Storing...')
-            self.data_frames.append(img)
+            self.save_background_frame(img, background_frame_idx + 1)
+            if self.perform_background_median:
+                self.background_frames.append(img)
 
             if (
-                frame_idx - self.skip_frames - self.num_background_frames ==
-                self.num_data_frames - 1
+                background_frame_idx == self.num_background_frames - 1 and
+                self.num_data_frames == 0
             ):
-                logger.info(
-                    f'{self.name}: Received final data frame. '
-                    'Writing and exiting...'
-                )
-                self.save_background()
-                self.save_data_frames()
-                self.stop_acquisition()
+                self.on_acquisition_complete()
+            return
 
-                # Free up some memory
-                self.background_frames.clear()
-                self.data_frames.clear()
-                return
+        data_frame_idx = (
+            frame_idx - self.skip_frames - self.num_background_frames
+        )
+        if data_frame_idx < self.num_data_frames:
+            logger.info(f'{self.name}: Encountered data frame. Storing...')
+            self.save_data_frame(img, data_frame_idx + 1)
+            if (
+                data_frame_idx == self.num_data_frames - 1 and
+                self.num_post_shot_background_frames == 0
+            ):
+                self.on_acquisition_complete()
+            return
+
+        post_shot_background_idx = (
+            frame_idx - self.skip_frames - self.num_background_frames -
+            self.num_data_frames
+        )
+        if post_shot_background_idx < self.num_post_shot_background_frames:
+            logger.info(
+                f'{self.name}: Encountered post shot background frame. '
+                'Storing...'
+            )
+            self.save_post_shot_background_frame(
+                img,
+                post_shot_background_idx + 1,
+            )
+            if (
+                post_shot_background_idx ==
+                self.num_post_shot_background_frames - 1
+            ):
+                self.on_acquisition_complete()
+            return
 
         # Making it to this point is unexpected behavior. We must
         # have collected more frames than the number of data frames.
@@ -304,21 +376,48 @@ class Detector:
             f'{self.name}: Received unexpected frame: {frame_idx}. Dropping.'
         )
 
+    def on_acquisition_complete(self):
+        logger.info(f'{self.name}: Received all frames. Finalizing...')
+
+        if self.perform_background_median:
+            self.save_background_median()
+
+        self.stop_acquisition()
+
+        # Free up some memory
+        self.background_frames.clear()
+
     @property
     def file_prefix(self):
         return f'{self.run_name}_{self.name}'
 
-    def frame_save_path(self, suffix: str = '') -> Path:
-        filename = f'{self.file_prefix}_frame{suffix}.tiff'
+    @property
+    def last_saved_data_frame_path(self) -> Path | None:
+        return self._last_saved_data_frame_path
+
+    @property
+    def saved_median_dark_subtraction_path(self) -> Path | None:
+        return self._saved_median_dark_subtraction_path
+
+    def internal_trigger_save_frame_path(self, suffix: str = '') -> Path:
+        filename = f'{self.file_prefix}_internal_trigger_frame{suffix}.tiff'
         return Path(self.save_files_path).resolve() / filename
 
-    def save_frame(self, img: np.ndarray, suffix: str = ''):
-        save_path = self.frame_save_path(suffix)
+    def save_frame(self, img: np.ndarray, save_path: Path):
         save_path.parent.mkdir(parents=True, exist_ok=True)
         Image.fromarray(img).save(save_path, 'TIFF')
-        logger.info(f'{self.name}: Saved data to: {save_path}')
+        logger.info(f'{self.name}: Saved frame to: {save_path}')
 
-    def save_background(self):
+    def save_internal_trigger_frame(self, img: np.ndarray, suffix: str = ''):
+        save_path = self.internal_trigger_save_frame_path(suffix)
+        self.save_frame(img, save_path)
+
+    def save_background_frame(self, img: np.ndarray, idx: int):
+        filename = f'{self.file_prefix}_background_{idx}.tiff'
+        save_path = Path(self.save_files_path).resolve() / filename
+        self.save_frame(img, save_path)
+
+    def save_background_median(self):
         if not self.background_frames:
             # Nothing to do...
             return
@@ -329,23 +428,19 @@ class Detector:
         prefix = self.file_prefix
         filename = f'{prefix}_background_median_of_{num_frames}_frames.tiff'
         save_path = Path(self.save_files_path).resolve() / filename
-        save_path.parent.mkdir(parents=True, exist_ok=True)
+        self.save_frame(background, save_path)
+        self._saved_median_dark_subtraction_path = save_path
 
-        Image.fromarray(background).save(save_path, 'TIFF')
-        logger.info(f'{self.name}: Saved background to: {save_path}')
+    def save_data_frame(self, img: np.ndarray, idx: int):
+        filename = f'{self.file_prefix}_data_{idx}.tiff'
+        save_path = Path(self.save_files_path).resolve() / filename
+        self.save_frame(img, save_path)
+        self._last_saved_data_frame_path = save_path
 
-    def save_data_frames(self):
-        save_dir = Path(self.save_files_path).resolve()
-        save_dir.mkdir(parents=True, exist_ok=True)
-
-        prefix = self.file_prefix
-
-        for i in range(len(self.data_frames)):
-            img = self.data_frames[i]
-            filename = f'{prefix}_data{i + 1}.tiff'
-            save_path = save_dir / filename
-            Image.fromarray(img).save(save_path, 'TIFF')
-            logger.info(f'{self.name}: Saved data to: {save_path}')
+    def save_post_shot_background_frame(self, img: np.ndarray, idx: int):
+        filename = f'{self.file_prefix}_post_shot_background_{idx}.tiff'
+        save_path = Path(self.save_files_path).resolve() / filename
+        self.save_frame(img, save_path)
 
     def write_statistics(self):
         if not self.frame_statistics:
