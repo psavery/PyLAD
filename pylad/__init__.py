@@ -7,20 +7,26 @@ def setup_logger(log_level=logging.INFO):
     logger = logging.getLogger('pylad')
     logger.setLevel(log_level)
 
-    # create console handler and set level to debug
-    ch = logging.StreamHandler()
-    ch.setLevel(logger.level)
-
     # create formatter
     formatter = logging.Formatter(
         '%(asctime)s [%(levelname)s] %(name)s: %(message)s'
     )
 
+    # create console handler and set level
+    ch = logging.StreamHandler()
+    ch.setLevel(logger.level)
+
+    # create file handler and set level
+    fh = logging.FileHandler('logger_output.log')
+    fh.setLevel(logger.level)
+
     # add formatter to ch
     ch.setFormatter(formatter)
+    fh.setFormatter(formatter)
 
     # add ch to logger
     logger.addHandler(ch)
+    logger.addHandler(fh)
 
 
 # Set up the logger by default
