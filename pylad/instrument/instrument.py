@@ -1,7 +1,7 @@
 import logging
 from pathlib import Path
 
-from pylad import api
+from pylad import api, setup_logger
 from pylad import constants as ct
 from pylad.instrument.detector import Detector
 
@@ -12,17 +12,21 @@ class Instrument:
     def __init__(self, run_name: str = 'Run1',
                  save_files_path: Path | None = None,
                  detector_prefix: str = 'varex'):
-        self.setup_logging()
-
         self.detectors: dict[str, Detector] = {}
 
-        self.run_name = run_name
+        self.set_run_name(run_name)
 
         if save_files_path is None:
             save_files_path = Path('.') / run_name
 
-        self.save_files_path = save_files_path
+        # Create the directory if it doesn't exist
+        save_files_path.mkdir(parents=True, exist_ok=True)
+
+        self.set_save_files_path(save_files_path)
         self.detector_prefix = detector_prefix
+
+        # Setup logging after setting the save files path
+        self.setup_logging()
 
         # Initialize the detectors
         self.initialize_detectors()
@@ -41,8 +45,18 @@ class Instrument:
     def setup_logging(self):
         # These are the same settings Clemens used
         api.enable_logging()
-        api.set_log_output('log.txt', False)
+        path = self.save_files_path / 'xisl_log.txt'
+        if path.exists():
+            path.unlink()
+
+        api.set_log_output(str(path), False)
         api.set_log_level(ct.LogLevels.TRACE)
+
+        logging_path = self.save_files_path / 'pylad_log.txt'
+        if logging_path.exists():
+            logging_path.unlink()
+
+        setup_logger(logging.DEBUG, logging_path)
 
     def initialize_detectors(self):
         logger.info('Initializing detectors')
@@ -69,6 +83,12 @@ class Instrument:
     @property
     def acquisition_finished(self) -> bool:
         return all(x.acquisition_finished for x in self.detectors.values())
+
+    @property
+    def all_expected_frames_received(self) -> bool:
+        return all(
+            x.all_expected_frames_received for x in self.detectors.values()
+        )
 
     def set_exposure_time(self, milliseconds: int):
         for det in self.detectors.values():
@@ -126,8 +146,7 @@ class Instrument:
     def run_name(self) -> str:
         return self._run_name
 
-    @run_name.setter
-    def run_name(self, name: str):
+    def set_run_name(self, name: str):
         self._run_name = name
         for det in self.detectors.values():
             det.run_name = name
@@ -136,8 +155,7 @@ class Instrument:
     def save_files_path(self) -> Path:
         return self._save_files_path
 
-    @save_files_path.setter
-    def save_files_path(self, path: Path):
+    def set_save_files_path(self, path: Path):
         self._save_files_path = Path(path)
         for det in self.detectors.values():
             det.save_files_path = self._save_files_path
@@ -155,3 +173,7 @@ class Instrument:
             k: det.saved_median_dark_subtraction_path
             for k, det in self.detectors.items()
         }
+
+    def shutdown_if_time_limit_exceeded(self):
+        for det in self.detectors.values():
+            det.shutdown_if_time_limit_exceeded()

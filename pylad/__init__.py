@@ -4,7 +4,7 @@ import signal
 from PIL import Image
 
 
-def setup_logger(log_level=logging.INFO):
+def setup_logger(log_level=logging.INFO, file_path='logger_output.log'):
     # create logger
     logger = logging.getLogger('pylad')
     logger.setLevel(log_level)
@@ -19,7 +19,7 @@ def setup_logger(log_level=logging.INFO):
     ch.setLevel(logger.level)
 
     # create file handler and set level
-    fh = logging.FileHandler('logger_output.log')
+    fh = logging.FileHandler(file_path)
     fh.setLevel(logger.level)
 
     # add formatter to ch
@@ -30,9 +30,6 @@ def setup_logger(log_level=logging.INFO):
     logger.addHandler(ch)
     logger.addHandler(fh)
 
-
-# Set up the logger by default
-setup_logger(logging.DEBUG)
 
 # Kill the program when ctrl-c is used
 signal.signal(signal.SIGINT, signal.SIG_DFL)

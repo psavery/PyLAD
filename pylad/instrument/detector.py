@@ -119,7 +119,10 @@ class Detector:
         self._last_saved_data_frame_path: Path | None = None
         self._saved_median_dark_subtraction_path: Path | None = None
 
+        self.max_seconds_between_frames = 15
+
         self._num_frames_acquired = 0
+        self.all_expected_frames_received = False
         self.acquisition_finished = False
 
         self._last_frame_callback_time = None
@@ -223,12 +226,9 @@ class Detector:
 
     def _frame_callback(self):
         # First record the time taken to receive this callback
-        prev = getattr(self, '_last_frame_callback_time', None)
+        prev = self._last_frame_callback_time
         self._last_frame_callback_time = time.time()
-        time_taken = (
-            self._last_frame_callback_time - prev
-            if prev is not None else self._acquisition_start_time
-        )
+        time_taken = self.time_since_last_frame_or_acquisition_start
 
         if prev is not None:
             logger.info(f'{self.name}: Time since last frame: {time_taken}')
@@ -257,7 +257,7 @@ class Detector:
 
         frame_handling_time = time.time() - self._last_frame_callback_time
         logger.info(f'{self.name}: Frame handling time: {frame_handling_time}')
-        if frame_handling_time > 0.075:
+        if not self.acquisition_finished and frame_handling_time > 0.075:
             logger.critical(
                 f'{self.name}: WARNING, frame handling time '
                 f'({frame_handling_time}) exceeded 75 milliseconds. '
@@ -386,6 +386,23 @@ class Detector:
 
         # Free up some memory
         self.background_frames.clear()
+        self.all_expected_frames_received = True
+
+    @property
+    def time_since_last_frame_or_acquisition_start(self) -> float:
+        prev = self._last_frame_callback_time
+        if prev is None:
+            prev = self._acquisition_start_time
+
+        return time.time() - prev
+
+    def shutdown_if_time_limit_exceeded(self):
+        if (
+            self.time_since_last_frame_or_acquisition_start >
+            self.max_seconds_between_frames
+        ):
+            logger.critical(f'{self.name}: Time limit exceeded. Shutting down')
+            self.stop_acquisition()
 
     @property
     def file_prefix(self):
@@ -422,6 +439,7 @@ class Detector:
             # Nothing to do...
             return
 
+        logging.info(f'{self.name}: Performing median on background frames...')
         background = np.median(self.background_frames, axis=0)
 
         num_frames = len(self.background_frames)
