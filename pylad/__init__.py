@@ -1,6 +1,8 @@
 import logging
 import signal
 
+from PIL import Image
+
 
 def setup_logger(log_level=logging.INFO):
     # create logger
@@ -34,3 +36,8 @@ setup_logger(logging.DEBUG)
 
 # Kill the program when ctrl-c is used
 signal.signal(signal.SIGINT, signal.SIG_DFL)
+
+# Pillow gets lazily initialized, and we want to make sure that it does
+# not get initialized during time-critical moments. So go ahead and
+# initialize it here.
+Image.init()
