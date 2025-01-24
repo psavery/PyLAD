@@ -10,7 +10,7 @@ logger = logging.getLogger(__name__)
 
 class Instrument:
     def __init__(self, run_name: str = 'Run1',
-                 save_files_path: Path | None = None,
+                 save_files_path: Path | str | None = None,
                  detector_prefix: str = 'varex'):
         self.detectors: dict[str, Detector] = {}
 
@@ -18,6 +18,8 @@ class Instrument:
 
         if save_files_path is None:
             save_files_path = Path('.') / run_name
+        else:
+            save_files_path = Path(save_files_path)
 
         # Create the directory if it doesn't exist
         save_files_path.mkdir(parents=True, exist_ok=True)
