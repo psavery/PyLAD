@@ -319,6 +319,12 @@ class Detector:
         # This is external trigger mode. Proceed.
         if frame_idx < self.skip_frames:
             logger.info(f'{self.name}: Encountered skip frame. Skipping...')
+            if (
+                frame_idx == self.skip_frames - 1 and
+                self.num_background_frames == 0 and
+                self.num_data_frames == 0
+            ):
+                self.on_acquisition_complete()
             return
 
         background_frame_idx = frame_idx - self.skip_frames
