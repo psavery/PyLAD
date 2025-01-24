@@ -439,7 +439,7 @@ class Detector:
             # Nothing to do...
             return
 
-        logging.info(f'{self.name}: Performing median on background frames...')
+        logger.info(f'{self.name}: Performing median on background frames...')
         background = np.median(self.background_frames, axis=0)
 
         num_frames = len(self.background_frames)

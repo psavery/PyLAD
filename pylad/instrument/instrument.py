@@ -48,8 +48,12 @@ class Instrument:
         # These are the same settings Clemens used
         api.enable_logging()
         path = self.save_files_path / 'xisl_log.txt'
-        if path.exists():
-            path.unlink()
+
+        # FIXME: if this is already open for reading from a previous
+        # run, we get an error when we try to unlink it, so I guess
+        # we'll just append to the end of it...
+        # if path.exists():
+        #     path.unlink()
 
         api.set_log_output(str(path), False)
         api.set_log_level(ct.LogLevels.TRACE)

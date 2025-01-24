@@ -9,6 +9,10 @@ def setup_logger(log_level=logging.INFO, file_path='logger_output.log'):
     logger = logging.getLogger('pylad')
     logger.setLevel(log_level)
 
+    # Remove any old handlers
+    while logger.handlers:
+        logger.removeHandler(logger.handlers[0])
+
     # create formatter
     formatter = logging.Formatter(
         '%(asctime)s [%(levelname)s] %(name)s: %(message)s'
