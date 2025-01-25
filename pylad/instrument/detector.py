@@ -234,8 +234,8 @@ class Detector:
 
         # First record the time taken to receive this callback
         prev = self._last_frame_callback_time
-        self._last_frame_callback_time = time.time()
         time_taken = self.time_since_last_frame_or_acquisition_start
+        self._last_frame_callback_time = time.time()
 
         if prev is not None:
             logger.info(f'{self.name}: Time since last frame: {time_taken}')
