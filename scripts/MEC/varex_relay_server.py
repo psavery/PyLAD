@@ -4,6 +4,13 @@ import subprocess
 
 BUFFER_SIZE = 65536
 
+# NOTE: in order to successfully copy the data automatically, you need to
+# have public key authentication set up for both the varex computer and
+# s3dfdtn
+COPY_EXPERIMENT_DATA = True
+VAREX_COMPUTER_USERNAME = 'mec-varex'
+VAREX_COMPUTER_IP = '172.21.43.22'
+VAREX_COMPUTER_SCP_NAME = f'{VAREX_COMPUTER_USERNAME}@{VAREX_COMPUTER_IP}'
 RUN_DESTINATION_DIR = 's3dfdtn:/sdf/scratch/lcls/ds/mec/mecl1019923/scratch/'
 
 # Server
@@ -52,6 +59,9 @@ with socket.socket(*socket_args) as daq_s, \
 
                 # Now see if varex instructs us to copy a directory over
                 varex_return = varex_conn.recv(BUFFER_SIZE)
+                if not COPY_EXPERIMENT_DATA:
+                    continue
+
                 try:
                     command = json.loads(varex_return.decode())
                     if 'copy_dir' in command:
@@ -59,7 +69,7 @@ with socket.socket(*socket_args) as daq_s, \
                         subprocess.run([
                             'scp',
                             '-r',
-                            f'mec-varex@172.21.43.22:{copy_dir}',
+                            f'{VAREX_COMPUTER_SCP_NAME}:{copy_dir}',
                             RUN_DESTINATION_DIR,
                         ], check=True)
                 except Exception as e:

@@ -20,7 +20,7 @@ with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
     s.connect((host, port))
     print('Connected to psmeclogin')
     while True:
-        print('Waiting for next json config...')
+        print('Waiting for "arm" signal from DAQ...')
         json_config = s.recv(BUFFER_SIZE)
         message_received_time = time.time()
         print('Received json config:', json_config)
