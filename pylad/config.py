@@ -10,7 +10,7 @@ def set_instrument_settings_from_config(instr: Instrument, config: dict):
         'num_skip_frames': 'set_skip_frames',
         'num_background_frames': 'set_num_background_frames',
         'num_data_frames': 'set_num_data_frames',
-        'num_post_shot_background_frames': 'set_num_post_shot_background_frames',  # noqa
+        'num_post_background_frames': 'set_num_post_shot_background_frames',  # noqa
         'save_files_path': 'set_save_files_path',
     }
 

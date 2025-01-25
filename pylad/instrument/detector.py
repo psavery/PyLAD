@@ -225,6 +225,13 @@ class Detector:
             self._current_buffer_idx = 0
 
     def _frame_callback(self):
+        # NOTE: this function is called automatically by the XISL software
+        # *in a different thread*. We need to make sure that we don't do
+        # anything thread-unsafe in this function, and in all the functions
+        # that this function calls.
+        # Thankfully, we can take advantage of the GIL to safely do things
+        # like setting and reading booleans, times, etc.
+
         # First record the time taken to receive this callback
         prev = self._last_frame_callback_time
         self._last_frame_callback_time = time.time()
