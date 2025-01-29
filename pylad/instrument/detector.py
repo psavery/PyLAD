@@ -1,5 +1,6 @@
 import logging
 from pathlib import Path
+import shutil
 import time
 
 import numpy as np
@@ -88,7 +89,7 @@ class Detector:
 
         # Exposure time is only used for internal trigger mode
         self._exposure_time = 100
-        self.gain = 4
+        self.gain = 0
 
         # We default to external trigger mode, since that is what will
         # be most commonly used
@@ -114,9 +115,11 @@ class Detector:
 
         # "background_frames" is the list of background frames we have acquired
         # It is only used if `self.perform_background_median` is `True`
+        self.acquiring_frames = False
+        self.data_paths: list[Path] = []
+        self.background_subtracted_data_paths: list[Path] = []
         self.background_frames: list[np.ndarray] = []
         self.perform_background_median = True
-        self._last_saved_data_frame_path: Path | None = None
         self._saved_median_dark_subtraction_path: Path | None = None
 
         self.max_seconds_between_frames = 15
@@ -146,7 +149,9 @@ class Detector:
             # Don't set it if not necessary
             return
 
-        api.set_exposure_time(self.handle, milliseconds)
+        # if self.is_internal_trigger:
+        #     api.set_exposure_time(self.handle, milliseconds)
+
         # The API doesn't have a getter, so we must store internally
         self._exposure_time = milliseconds
 
@@ -192,9 +197,12 @@ class Detector:
         return self.get_trigger_mode() == mode
 
     def start_acquisition(self):
+        self.acquiring_frames = True
         self._num_frames_acquired = 0
         self._last_frame_callback_time = None
 
+        self.data_paths.clear()
+        self.background_subtracted_data_paths.clear()
         self.background_frames.clear()
         self.frame_statistics.clear()
 
@@ -216,8 +224,8 @@ class Detector:
         )
 
     def stop_acquisition(self):
+        self.acquiring_frames = False
         api.acquisition_abort(self.handle)
-        self.acquisition_finished = True
 
     def increment_buffer_index(self):
         self._current_buffer_idx += 1
@@ -225,13 +233,6 @@ class Detector:
             self._current_buffer_idx = 0
 
     def _frame_callback(self):
-        # NOTE: this function is called automatically by the XISL software
-        # *in a different thread*. We need to make sure that we don't do
-        # anything thread-unsafe in this function, and in all the functions
-        # that this function calls.
-        # Thankfully, we can take advantage of the GIL to safely do things
-        # like setting and reading booleans, times, etc.
-
         # First record the time taken to receive this callback
         prev = self._last_frame_callback_time
         time_taken = self.time_since_last_frame_or_acquisition_start
@@ -255,6 +256,9 @@ class Detector:
 
         img = self.frame_buffer[buffer_idx]  # noqa
 
+        # Transpose appears to be needed
+        img = img.T
+
         self._handle_frame(img)
 
         self._num_frames_acquired += 1
@@ -273,6 +277,9 @@ class Detector:
 
     def _handle_frame(self, img: np.ndarray):
         frame_idx = self._num_frames_acquired
+
+        # This is the event number used by SLAC
+        event_number = frame_idx - self.skip_frames + 1
 
         stats = {
             'collection_time': time.time(),
@@ -305,6 +312,7 @@ class Detector:
             ):
                 self.write_statistics()
                 self.stop_acquisition()
+                self.acquisition_finished = True
 
             return
 
@@ -339,7 +347,7 @@ class Detector:
             logger.info(
                 f'{self.name}: Encountered background frame. Storing...'
             )
-            self.save_background_frame(img, background_frame_idx + 1)
+            self.save_background_frame(img, event_number)
             if self.perform_background_median:
                 self.background_frames.append(img)
 
@@ -355,7 +363,7 @@ class Detector:
         )
         if data_frame_idx < self.num_data_frames:
             logger.info(f'{self.name}: Encountered data frame. Storing...')
-            self.save_data_frame(img, data_frame_idx + 1)
+            self.save_data_frame(img, event_number)
             if (
                 data_frame_idx == self.num_data_frames - 1 and
                 self.num_post_shot_background_frames == 0
@@ -374,7 +382,7 @@ class Detector:
             )
             self.save_post_shot_background_frame(
                 img,
-                post_shot_background_idx + 1,
+                event_number,
             )
             if (
                 post_shot_background_idx ==
@@ -392,14 +400,23 @@ class Detector:
     def on_acquisition_complete(self):
         logger.info(f'{self.name}: Received all frames. Finalizing...')
 
-        if self.perform_background_median:
-            self.save_background_median()
-
+        # First, stop the acquisition so we won't acquire more frames
         self.stop_acquisition()
+
+        if self.perform_background_median:
+            logger.info(
+                f'{self.name}: Performing median background subtraction...'
+            )
+            self.save_background_median()
+            logger.info(f'{self.name}: Saving background-subtracted files...')
+
+        self.save_background_subtracted_data_files()
 
         # Free up some memory
         self.background_frames.clear()
         self.all_expected_frames_received = True
+
+        self.acquisition_finished = True
 
     @property
     def time_since_last_frame_or_acquisition_start(self) -> float:
@@ -411,19 +428,27 @@ class Detector:
 
     def shutdown_if_time_limit_exceeded(self):
         if (
+            self.acquiring_frames and
             self.time_since_last_frame_or_acquisition_start >
             self.max_seconds_between_frames
         ):
             logger.critical(f'{self.name}: Time limit exceeded. Shutting down')
             self.stop_acquisition()
+            self.acquisition_finished = True
 
     @property
     def file_prefix(self):
-        return f'{self.run_name}_{self.name}'
+        return f'Run_{self.run_name}'
 
     @property
-    def last_saved_data_frame_path(self) -> Path | None:
-        return self._last_saved_data_frame_path
+    def data_path_to_visualize(self) -> Path | None:
+        if self.background_subtracted_data_paths:
+            return self.background_subtracted_data_paths[-1]
+
+        if self.data_paths:
+            return self.data_paths[-1]
+
+        return None
 
     @property
     def saved_median_dark_subtraction_path(self) -> Path | None:
@@ -443,7 +468,7 @@ class Detector:
         self.save_frame(img, save_path)
 
     def save_background_frame(self, img: np.ndarray, idx: int):
-        filename = f'{self.file_prefix}_background_{idx}.tiff'
+        filename = f'{self.file_prefix}_evt_{idx}_{self.name}_background.tiff'
         save_path = Path(self.save_files_path).resolve() / filename
         self.save_frame(img, save_path)
 
@@ -456,20 +481,80 @@ class Detector:
         background = np.median(self.background_frames, axis=0)
 
         num_frames = len(self.background_frames)
-        prefix = self.file_prefix
-        filename = f'{prefix}_background_median_of_{num_frames}_frames.tiff'
+        filename = f'{self.file_prefix}_background_median_of_{num_frames}_frames_{self.name}.tiff'
         save_path = Path(self.save_files_path).resolve() / filename
         self.save_frame(background, save_path)
         self._saved_median_dark_subtraction_path = save_path
+        self.save_previous_median_dark()
+
+    def save_previous_median_dark(self):
+        path = self._saved_median_dark_subtraction_path
+        if path is None:
+            return
+
+        write_path = self.previous_median_dark_path
+        write_path.parent.mkdir(parents=True, exist_ok=True)
+
+        shutil.copy(path, write_path)
+        if self.name == 'Varex1':
+            # Only save the dark number with the first detector
+            self.save_previous_median_dark_run_number()
+
+    @property
+    def previous_median_dark_path(self) -> Path:
+        previous_dir = Path.home() / '.varex/most_recent_backgrounds'
+        return previous_dir / f'last_dark_{self.name}.tiff'
+
+    def save_previous_median_dark_run_number(self):
+        previous_dir = Path.home() / '.varex/most_recent_backgrounds'
+        filepath = previous_dir / 'run_num.txt'
+        with open(filepath, 'w') as wf:
+            wf.write(self.file_prefix)
+
+    @property
+    def previous_median_dark_run_number(self) -> str | None:
+        previous_dir = Path.home() / '.varex/most_recent_backgrounds'
+        filepath = previous_dir / 'run_num.txt'
+        if not filepath.exists():
+            return
+
+        with open(filepath, 'r') as rf:
+            return rf.read()
+
+    def save_background_subtracted_data_files(self):
+        median_background_path = self.saved_median_dark_subtraction_path
+        if median_background_path is None:
+            median_background_path = self.previous_median_dark_path
+            if median_background_path.exists():
+                logger.info(
+                    f'{self.name}: No median background calculated. '
+                    'Re-using the last median background at: '
+                    f'{median_background_path}, taken from run '
+                    f'{self.previous_median_dark_run_number}'
+                )
+            else:
+                logger.critical(
+                    f'{self.name}: cannot save background subtracted files'
+                )
+                return
+
+        logger.info(f'{self.name}: saving ds files...')
+        background = np.array(Image.open(median_background_path), dtype=float)
+        for path in self.data_paths:
+            new_path = path.with_name(f'{path.stem}_ds{path.suffix}')
+            data = np.array(Image.open(path), dtype=float)
+            subtracted = data - background
+            self.save_frame(subtracted, new_path)
+            self.background_subtracted_data_paths.append(new_path)
 
     def save_data_frame(self, img: np.ndarray, idx: int):
-        filename = f'{self.file_prefix}_data_{idx}.tiff'
+        filename = f'{self.file_prefix}_evt_{idx}_{self.name}_data.tiff'
         save_path = Path(self.save_files_path).resolve() / filename
         self.save_frame(img, save_path)
-        self._last_saved_data_frame_path = save_path
+        self.data_paths.append(save_path)
 
     def save_post_shot_background_frame(self, img: np.ndarray, idx: int):
-        filename = f'{self.file_prefix}_post_shot_background_{idx}.tiff'
+        filename = f'{self.file_prefix}_evt_{idx}_{self.name}_post_shot_background.tiff'
         save_path = Path(self.save_files_path).resolve() / filename
         self.save_frame(img, save_path)
 

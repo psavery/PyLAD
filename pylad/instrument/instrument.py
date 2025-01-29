@@ -11,7 +11,7 @@ logger = logging.getLogger(__name__)
 class Instrument:
     def __init__(self, run_name: str = 'Run1',
                  save_files_path: Path | str | None = None,
-                 detector_prefix: str = 'varex'):
+                 detector_prefix: str = 'Varex'):
         self.detectors: dict[str, Detector] = {}
 
         self.set_run_name(run_name)
@@ -59,8 +59,11 @@ class Instrument:
         api.set_log_level(ct.LogLevels.TRACE)
 
         logging_path = self.save_files_path / 'pylad_log.txt'
-        if logging_path.exists():
-            logging_path.unlink()
+        # FIXME: if this is already open for reading from a previous
+        # run, we get an error when we try to unlink it, so I guess
+        # we'll just append to the end of it...
+        # if logging_path.exists():
+        #     logging_path.unlink()
 
         setup_logger(logging.DEBUG, logging_path)
 
@@ -167,9 +170,9 @@ class Instrument:
             det.save_files_path = self._save_files_path
 
     @property
-    def last_saved_data_frame_paths(self) -> dict[str, Path | None]:
+    def data_paths_to_visualize(self) -> dict[str, Path | None]:
         return {
-            k: det.last_saved_data_frame_path
+            k: det.data_path_to_visualize
             for k, det in self.detectors.items()
         }
 
