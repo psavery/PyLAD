@@ -1,4 +1,5 @@
 import json
+from pathlib import Path
 import socket
 import subprocess
 
@@ -11,7 +12,9 @@ COPY_EXPERIMENT_DATA = True
 VAREX_COMPUTER_USERNAME = 'mec-varex'
 VAREX_COMPUTER_IP = '172.21.43.22'
 VAREX_COMPUTER_SCP_NAME = f'{VAREX_COMPUTER_USERNAME}@{VAREX_COMPUTER_IP}'
-RUN_DESTINATION_DIR = 's3dfdtn:/sdf/scratch/lcls/ds/mec/mecl1019923/scratch/'
+RUN_DESTINATION_HOST = 's3dfdtn'
+RUN_DESTINATION_DIR = '/sdf/data/lcls/ds/mec/mecl1019923/results'
+GROUP_PERMISSIONS='mecl1019923'
 
 # Server
 host = '0.0.0.0'
@@ -59,6 +62,7 @@ with socket.socket(*socket_args) as daq_s, \
 
                 # Now see if varex instructs us to copy a directory over
                 varex_return = varex_conn.recv(BUFFER_SIZE)
+                print('Received varex instructions:', varex_return)
                 if not COPY_EXPERIMENT_DATA:
                     continue
 
@@ -70,7 +74,27 @@ with socket.socket(*socket_args) as daq_s, \
                             'scp',
                             '-r',
                             f'{VAREX_COMPUTER_SCP_NAME}:{copy_dir}',
-                            RUN_DESTINATION_DIR,
+                            f'{RUN_DESTINATION_HOST}:{RUN_DESTINATION_DIR}',
                         ], check=True)
+
+                        # Add read permissions to the group
+                        dir_name = Path(copy_dir).name
+                        new_dir_path = Path(RUN_DESTINATION_DIR) / dir_name
+                        chmod_commands = [
+                            f'chmod g+x {new_dir_path}',
+                            f'chmod -R g+r {new_dir_path}',
+                            # Run them again since it doesn't always work for some reason
+                            f'chmod g+x {new_dir_path}',
+                            f'chmod -R g+r {new_dir_path}',
+                        ]
+                        for cmd in chmod_commands:
+                            full_cmd = [
+                                'ssh',
+                                RUN_DESTINATION_HOST,
+                                cmd,
+                            ]
+                            print('Full cmd:', full_cmd)
+                            subprocess.run(full_cmd, check=True)
+
                 except Exception as e:
                     print('Failed to copy run directory over:', e)

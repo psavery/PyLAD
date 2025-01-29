@@ -30,7 +30,7 @@ with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
             run_name = config['run_name']
 
             # Write the json file to the write_dir
-            run_dir = WRITE_DIR / run_name
+            run_dir = WRITE_DIR / f'run{run_name}'
             run_dir.mkdir(parents=True, exist_ok=True)
             json_path = run_dir / 'pylad_config.json'
             with open(json_path, 'w') as wf:
@@ -70,10 +70,10 @@ with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
 
         # If we received all expected frames, proceed to open
         # the pylad viewer GUI automatically
-        last_data_files = list(instr.last_saved_data_frame_paths.values())
-        if False and all(x is not None for x in last_data_files):
+        data_paths_to_visualize = list(instr.data_paths_to_visualize.values())
+        if all(x is not None for x in data_paths_to_visualize):
             try:
-                subprocess.Popen(['pylad-viewer'] + [str(x) for x in last_data_files])
+                subprocess.Popen(['pylad-viewer'] + [str(x) for x in data_paths_to_visualize])
             except Exception as e:
                 # It's not the end of the world that it failed
                 print('Failed to open "pylad-viewer":', e)
