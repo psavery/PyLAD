@@ -89,7 +89,10 @@ class Detector:
 
         # Exposure time is only used for internal trigger mode
         self._exposure_time = 100
-        self.gain = 0
+        self.gain = 4
+
+        # Binning of 1 is default. 2 means 2x2, and 3 means 3x3
+        self.binning = 1
 
         # We default to external trigger mode, since that is what will
         # be most commonly used
@@ -168,6 +171,20 @@ class Detector:
         api.set_camera_gain(self.handle, v)
         # The API doesn't have a getter, so we must store internally
         self._gain = v
+
+    @property
+    def binning(self):
+        return self._binning
+
+    @binning.setter
+    def binning(self, v: int):
+        if v == getattr(self, '_binning', None):
+            # Don't set it if not necessary
+            return
+
+        api.set_binning_mode(self.handle, v)
+        # Store internally
+        self._binning = v
 
     def enable_external_trigger(self):
         self.set_frame_sync_mode(ct.Triggers.HIS_SYNCMODE_EXTERNAL_TRIGGER)

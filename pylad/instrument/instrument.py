@@ -100,12 +100,21 @@ class Instrument:
         )
 
     def set_exposure_time(self, milliseconds: int):
+        # Exposure time is only used for internal timer.
+        # 100 milliseconds means 10 Hz, for example.
         for det in self.detectors.values():
             det.exposure_time = milliseconds
 
     def set_gain(self, gain: int):
+        # Gain goes from 1 to 7, with the background decreasing for higher gain
         for det in self.detectors.values():
             det.gain = gain
+
+    def set_binning(self, binning: int):
+        # Set the binning. Default is 1 (no binning). 2 means 2x2 binning,
+        # and 3 means 3x3 binning.
+        for det in self.detectors.values():
+            det.binning = binning
 
     def enable_internal_trigger(self):
         for det in self.detectors.values():
