@@ -6,7 +6,10 @@ from pylad.instrument import Instrument
 
 def set_instrument_settings_from_config(instr: Instrument, config: dict):
     settings_mapping = {
+        # This should go first
         'run_name': 'set_run_name',
+        # Alphabetize after
+        'gain': 'set_gain',
         'num_skip_frames': 'set_skip_frames',
         'num_background_frames': 'set_num_background_frames',
         'num_data_frames': 'set_num_data_frames',
