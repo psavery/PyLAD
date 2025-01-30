@@ -41,38 +41,6 @@ class Detector:
         # Not sure what a camera mode of 0 is, but that's what Clemens did.
         api.set_camera_mode(self.handle, 0)
 
-        self._config = api.get_detector_configuration(self.handle)
-
-        # These are essential, so grab them and make sure they were
-        # in the config.
-        self.rows = self._config['rows']
-        self.columns = self._config['columns']
-
-        # This was fixed to 50 in Clemens' code
-        self.num_frames_in_buffer = 50
-        self._current_buffer_idx = 0
-
-        allocator = FrameBufferAllocator(
-            self.rows,
-            self.columns,
-            self.num_frames_in_buffer,
-        )
-        # This is a special numpy array that points to the
-        # memory-aligned frame buffer.
-        self.frame_buffer = allocator.allocate()
-
-        # Define destination buffers
-        api.define_destination_buffers(
-            self.handle,
-            self.frame_buffer_pointer,
-            self.num_frames_in_buffer,
-            self.rows,
-            self.columns,
-        )
-
-        # Reset frame count
-        api.reset_frame_count(self.handle)
-
         # Set the frame callback
         api.set_callbacks_and_messages(
             self.handle,
@@ -186,6 +154,9 @@ class Detector:
         # Store internally
         self._binning = v
 
+        # The frame buffer must be re-created
+        self._create_frame_buffer()
+
     def enable_external_trigger(self):
         self.set_frame_sync_mode(ct.Triggers.HIS_SYNCMODE_EXTERNAL_TRIGGER)
 
@@ -212,6 +183,39 @@ class Detector:
     def is_internal_trigger(self):
         mode = ct.Triggers.HIS_SYNCMODE_INTERNAL_TIMER
         return self.get_trigger_mode() == mode
+
+    def _create_frame_buffer(self):
+        self._config = api.get_detector_configuration(self.handle)
+
+        # These are essential, so grab them and make sure they were
+        # in the config.
+        self.rows = self._config['rows']
+        self.columns = self._config['columns']
+
+        # This was fixed to 50 in Clemens' code
+        self.num_frames_in_buffer = 50
+        self._current_buffer_idx = 0
+
+        allocator = FrameBufferAllocator(
+            self.rows,
+            self.columns,
+            self.num_frames_in_buffer,
+        )
+        # This is a special numpy array that points to the
+        # memory-aligned frame buffer.
+        self.frame_buffer = allocator.allocate()
+
+        # Define destination buffers
+        api.define_destination_buffers(
+            self.handle,
+            self.frame_buffer_pointer,
+            self.num_frames_in_buffer,
+            self.rows,
+            self.columns,
+        )
+
+        # Reset frame count
+        api.reset_frame_count(self.handle)
 
     def start_acquisition(self):
         self.acquiring_frames = True
