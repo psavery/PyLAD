@@ -319,12 +319,11 @@ class Detector:
         if self.is_internal_trigger:
             # Just write out the frames to disk as they come in...
             # Always use a unique name
-            counter = 1
-            path = self.internal_trigger_save_frame_path(str(counter))
-            while path.exists():
-                counter += 1
-                path = self.internal_trigger_save_frame_path(str(counter))
-            self.save_internal_trigger_frame(img, str(counter))
+            self.save_internal_trigger_frame(img, event_number)
+            # FIXME: temporary code to kill internal trigger after 4000 frames
+            if event_number == 20:
+                self.stop_acquisition()
+                self.acquisition_finished = True
             return
         elif not self.is_external_trigger:
             raise NotImplementedError(
@@ -454,14 +453,14 @@ class Detector:
     def saved_median_dark_subtraction_path(self) -> Path | None:
         return self._saved_median_dark_subtraction_path
 
-    def internal_trigger_save_frame_path(self, suffix: str = '') -> Path:
-        filename = f'{self.file_prefix}_internal_trigger_frame{suffix}.tiff'
-        return Path(self.save_files_path).resolve() / filename
-
     def save_frame(self, img: np.ndarray, save_path: Path):
         save_path.parent.mkdir(parents=True, exist_ok=True)
         Image.fromarray(img).save(save_path, 'TIFF')
         logger.info(f'{self.name}: Saved frame to: {save_path}')
+
+    def internal_trigger_save_frame_path(self, suffix: str = '') -> Path:
+        filename = f'{self.file_prefix}_{self.name}_internal_trigger_frame{suffix}.tiff'
+        return Path(self.save_files_path).resolve() / filename
 
     def save_internal_trigger_frame(self, img: np.ndarray, suffix: str = ''):
         save_path = self.internal_trigger_save_frame_path(suffix)
