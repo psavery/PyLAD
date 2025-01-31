@@ -7,14 +7,13 @@ BUFFER_SIZE = 65536
 
 # NOTE: in order to successfully copy the data automatically, you need to
 # have public key authentication set up for both the varex computer and
-# s3dfdtn
+# s3dfdtn. Feel free to disable if needed.
 COPY_EXPERIMENT_DATA = True
 VAREX_COMPUTER_USERNAME = 'mec-varex'
 VAREX_COMPUTER_IP = '172.21.43.22'
 VAREX_COMPUTER_SCP_NAME = f'{VAREX_COMPUTER_USERNAME}@{VAREX_COMPUTER_IP}'
 RUN_DESTINATION_HOST = 's3dfdtn'
 RUN_DESTINATION_DIR = '/sdf/data/lcls/ds/mec/mecl1019923/results'
-GROUP_PERMISSIONS='mecl1019923'
 
 # Server
 host = '0.0.0.0'
@@ -83,7 +82,11 @@ with socket.socket(*socket_args) as daq_s, \
                         chmod_commands = [
                             f'chmod g+x {new_dir_path}',
                             f'chmod -R g+r {new_dir_path}',
-                            # Run them again since it doesn't always work for some reason
+                            # For some reason, the above chmod commands
+                            # sometimes don't work, even though they don't
+                            # produce any errors whatsoever. Running the
+                            # exact same commands over again seems to
+                            # ensure they run successfully.
                             f'chmod g+x {new_dir_path}',
                             f'chmod -R g+r {new_dir_path}',
                         ]

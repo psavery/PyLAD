@@ -9,7 +9,7 @@ from pylad.config import create_instrument_from_json_file
 
 BUFFER_SIZE = 65536
 WRITE_DIR = Path('./Runs')
-
+RUN_PYLAD_VIEWER = True
 
 # Client
 host = '172.21.43.21'
@@ -71,7 +71,7 @@ with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
         # If we received all expected frames, proceed to open
         # the pylad viewer GUI automatically
         data_paths_to_visualize = list(instr.data_paths_to_visualize.values())
-        if all(x is not None for x in data_paths_to_visualize):
+        if RUN_PYLAD_VIEWER and all(x is not None for x in data_paths_to_visualize):
             try:
                 subprocess.Popen(['pylad-viewer'] + [str(x) for x in data_paths_to_visualize])
             except Exception as e:
