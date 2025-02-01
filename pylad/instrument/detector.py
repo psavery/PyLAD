@@ -57,7 +57,7 @@ class Detector:
 
         # Exposure time is only used for internal trigger mode
         self._exposure_time = 100
-        self.gain = 4
+        self.gain = 1
 
         # Binning of 1 is default. 2 means 2x2, and 3 means 3x3
         self.binning = 1
