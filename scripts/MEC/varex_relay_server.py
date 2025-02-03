@@ -7,13 +7,13 @@ BUFFER_SIZE = 65536
 
 # NOTE: in order to successfully copy the data automatically, you need to
 # have public key authentication set up for both the varex computer and
-# s3dfdtn. Feel free to disable if needed.
+# s3dfdtn. Feel free to disable automatic copying if needed.
 COPY_EXPERIMENT_DATA = True
 VAREX_COMPUTER_USERNAME = 'mec-varex'
 VAREX_COMPUTER_IP = '172.21.43.22'
 VAREX_COMPUTER_SCP_NAME = f'{VAREX_COMPUTER_USERNAME}@{VAREX_COMPUTER_IP}'
 RUN_DESTINATION_HOST = 's3dfdtn'
-RUN_DESTINATION_DIR = '/sdf/data/lcls/ds/mec/mecl1019923/results'
+EXPERIMENTS_DIR = '/sdf/data/lcls/ds/mec/'
 
 # Server
 host = '0.0.0.0'
@@ -46,6 +46,15 @@ with socket.socket(*socket_args) as daq_s, \
                 data = daq_conn.recv(BUFFER_SIZE)
                 print('Received:', data.decode())
 
+                try:
+                    # Extract the experiment name. Fail if we can't get it.
+                    daq_command = json.loads(data.decode())
+                    experiment_name = daq_command['experiment']
+                except Exception as e:
+                    print('Failed extracting experiment name:', e)
+                    daq_conn.sendall(b'NOT OK')
+                    continue
+
                 varex_conn.sendall(data)
                 print('Sent data to Varex')
 
@@ -65,6 +74,7 @@ with socket.socket(*socket_args) as daq_s, \
                 if not COPY_EXPERIMENT_DATA:
                     continue
 
+                results_dir = f'{EXPERIMENTS_DIR}/{experiment_name}/results'
                 try:
                     command = json.loads(varex_return.decode())
                     if 'copy_dir' in command:
@@ -73,12 +83,12 @@ with socket.socket(*socket_args) as daq_s, \
                             'scp',
                             '-r',
                             f'{VAREX_COMPUTER_SCP_NAME}:{copy_dir}',
-                            f'{RUN_DESTINATION_HOST}:{RUN_DESTINATION_DIR}',
+                            f'{RUN_DESTINATION_HOST}:{results_dir}',
                         ], check=True)
 
                         # Add read permissions to the group
                         dir_name = Path(copy_dir).name
-                        new_dir_path = Path(RUN_DESTINATION_DIR) / dir_name
+                        new_dir_path = Path(results_dir) / dir_name
                         chmod_commands = [
                             f'chmod g+x {new_dir_path}',
                             f'chmod -R g+r {new_dir_path}',
