@@ -1,5 +1,6 @@
 import json
 from pathlib import Path
+import shutil
 import socket
 import subprocess
 import time
@@ -41,6 +42,21 @@ with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
 
         except Exception as e:
             print('Failed to load config:', e)
+            s.sendall(b'NOT OK')
+            continue
+
+        # Compute disk usage
+        # If we don't have enough disk space left for a run,
+        # then abort!
+        total, used, free = shutil.disk_usage('C:/')
+        free_gb = free / (2**30)
+        if free_gb < 5:
+            print(
+                'The Varex computer is almost out of memory! '
+                f'Only {free_gb} GB remain! Please delete runs from '
+                f'the run directory at {WRITE_DIR} before running again. '
+                'Verify these runs are saved on s3dftn before deleting.'
+            )
             s.sendall(b'NOT OK')
             continue
 
