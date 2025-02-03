@@ -8,7 +8,7 @@ from pylad.config import create_instrument_from_json_file
 
 
 BUFFER_SIZE = 65536
-WRITE_DIR = Path('./Runs')
+WRITE_DIR = Path('./MECVarexData')
 RUN_PYLAD_VIEWER = True
 
 # Client
@@ -30,9 +30,10 @@ with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
             json_config = json_config.decode('utf-8')
             config = json.loads(json_config)
             run_name = config['run_name']
+            experiment_name = config['experiment']
 
             # Write the json file to the write_dir
-            run_dir = WRITE_DIR / f'run{run_name}'
+            run_dir = WRITE_DIR / experiment_name / f'run{run_name}'
             run_dir.mkdir(parents=True, exist_ok=True)
             json_path = run_dir / 'pylad_config.json'
             with open(json_path, 'w') as wf:
