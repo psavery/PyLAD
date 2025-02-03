@@ -19,6 +19,7 @@ class Detector:
         self.handle = detector_handle
         self.name = name
         self.run_name = run_name
+        self.experiment_name = 'experiment_name'
 
         if save_files_path is None:
             save_files_path = Path('.').resolve()
@@ -521,20 +522,26 @@ class Detector:
             self.save_previous_median_dark_run_number()
 
     @property
+    def most_recent_backgrounds_dir(self) -> Path:
+        experiment_name = self.experiment_name
+        gain = self.gain
+        return (
+            Path.home() /
+            '.varex/most_recent_backgrounds/{experiment_name}/gain_{gain}'
+        )
+
+    @property
     def previous_median_dark_path(self) -> Path:
-        previous_dir = Path.home() / '.varex/most_recent_backgrounds'
-        return previous_dir / f'last_dark_{self.name}.tiff'
+        return self.most_recent_backgrounds_dir / f'last_dark_{self.name}.tiff'
 
     def save_previous_median_dark_run_number(self):
-        previous_dir = Path.home() / '.varex/most_recent_backgrounds'
-        filepath = previous_dir / 'run_num.txt'
+        filepath = self.most_recent_backgrounds_dir / 'run_num.txt'
         with open(filepath, 'w') as wf:
             wf.write(self.file_prefix)
 
     @property
     def previous_median_dark_run_number(self) -> str | None:
-        previous_dir = Path.home() / '.varex/most_recent_backgrounds'
-        filepath = previous_dir / 'run_num.txt'
+        filepath = self.most_recent_backgrounds_dir / 'run_num.txt'
         if not filepath.exists():
             return
 

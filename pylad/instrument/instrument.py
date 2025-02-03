@@ -15,6 +15,7 @@ class Instrument:
         self.detectors: dict[str, Detector] = {}
 
         self.set_run_name(run_name)
+        self._experiment_name = 'experiment_name'
 
         if save_files_path is None:
             save_files_path = Path('.') / run_name
@@ -168,6 +169,15 @@ class Instrument:
         self._run_name = name
         for det in self.detectors.values():
             det.run_name = name
+
+    @property
+    def experiment_name(self) -> str:
+        return self._experiment_name
+
+    def set_experiment_name(self, name: str):
+        self._experiment_name = name
+        for det in self.detectors.values():
+            det.experiment_name = name
 
     @property
     def save_files_path(self) -> Path:
