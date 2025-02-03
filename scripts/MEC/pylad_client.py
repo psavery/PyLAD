@@ -15,6 +15,8 @@ RUN_PYLAD_VIEWER = True
 host = '172.21.43.21'
 port = 5678
 
+pylad_viewer_process = None
+
 with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
     print('Setting up connection with psmeclogin...')
     s.connect((host, port))
@@ -71,9 +73,28 @@ with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
         # If we received all expected frames, proceed to open
         # the pylad viewer GUI automatically
         data_paths_to_visualize = list(instr.data_paths_to_visualize.values())
-        if RUN_PYLAD_VIEWER and all(x is not None for x in data_paths_to_visualize):
+        if (
+            RUN_PYLAD_VIEWER and
+            all(x is not None for x in data_paths_to_visualize)
+        ):
             try:
-                subprocess.Popen(['pylad-viewer'] + [str(x) for x in data_paths_to_visualize])
+                paths = [str(x) for x in data_paths_to_visualize]
+                if (
+                    pylad_viewer_process is None or
+                    # If "poll()" returns None, it means the process
+                    # was terminated, and we need to start a new one.
+                    pylad_viewer_process.poll() is not None
+                ):
+                    pylad_viewer_process = subprocess.Popen(
+                        ['pylad-viewer'] + paths,
+                        stdin=subprocess.PIPE,
+                    )
+                else:
+                    # Tell the process to open a new set of files
+                    message = ', '.join(paths) + '\n'
+                    pylad_viewer_process.stdin.write(message.encode())
+                    pylad_viewer_process.stdin.flush()
+
             except Exception as e:
                 # It's not the end of the world that it failed
-                print('Failed to open "pylad-viewer":', e)
+                print('Failed to run/update "pylad-viewer":', e)
