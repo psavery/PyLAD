@@ -527,7 +527,7 @@ class Detector:
         gain = self.gain
         return (
             Path.home() /
-            '.varex/most_recent_backgrounds/{experiment_name}/gain_{gain}'
+            f'.varex/most_recent_backgrounds/{experiment_name}/gain_{gain}'
         )
 
     @property
