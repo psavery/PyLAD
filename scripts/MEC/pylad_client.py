@@ -87,6 +87,9 @@ with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
         dir_path = instr.save_files_path.resolve().as_posix()
         s.sendall(json.dumps({"copy_dir": dir_path}).encode('utf-8'))
 
+        # Now try to free up some memory from the previous acquisition
+        instr.resource_cleanup()
+
         # If we received all expected frames, proceed to open
         # the pylad viewer GUI automatically
         data_paths_to_visualize = list(instr.data_paths_to_visualize.values())

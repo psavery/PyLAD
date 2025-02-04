@@ -25,6 +25,10 @@ def cleanup():
     lib.Acquisition_Global_Cleanup()
 
 
+def close_all():
+    lib.Acquisition_CloseAll()
+
+
 def enable_logging(b: bool = True):
     lib.Acquisition_EnableLogging(b)
 

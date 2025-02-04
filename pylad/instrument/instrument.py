@@ -215,3 +215,7 @@ class Instrument:
     def shutdown_if_time_limit_exceeded(self):
         for det in self.detectors.values():
             det.shutdown_if_time_limit_exceeded()
+
+    def resource_cleanup(self):
+        # Try to clean up some resources...
+        api.close_all()
