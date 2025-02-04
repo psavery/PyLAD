@@ -1,6 +1,8 @@
 import logging
 from pathlib import Path
 
+import psutil
+
 from pylad import api, setup_logger
 from pylad import constants as ct
 from pylad.instrument.detector import Detector
@@ -71,6 +73,9 @@ class Instrument:
     def initialize_detectors(self):
         logger.info('Initializing detectors')
 
+        # This helps us keep track of whether we have some kind of memory leak
+        self.print_available_memory()
+
         self.detectors = {}
         num_detectors = api.initialize_sensors()
 
@@ -89,6 +94,11 @@ class Instrument:
             )
 
         logger.info(f'Successfully initialized {num_detectors} detectors')
+
+    def print_available_memory(self):
+        mem = psutil.virtual_memory()
+        available_gb = round(mem.available / 2**30, 2)
+        logger.info(f'Available RAM: {available_gb} GB')
 
     @property
     def acquisition_finished(self) -> bool:
