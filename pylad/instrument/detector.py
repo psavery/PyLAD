@@ -194,7 +194,14 @@ class Detector:
         self.columns = self._config['columns']
 
         # This was fixed to 50 in Clemens' code
-        self.num_frames_in_buffer = 50
+        # But we process the frames faster than they come in, so it
+        # doesn't really matter that much...
+        # In fact, Varex did not provide a way to free the memory on the C
+        # side after allocating a buffer, so this is kind of a memory leak,
+        # and we want the number of frames in the buffer to be as few as
+        # possible so that when we reallocate several times, we don't lose
+        # too much RAM.
+        self.num_frames_in_buffer = 2
         self._current_buffer_idx = 0
 
         allocator = FrameBufferAllocator(

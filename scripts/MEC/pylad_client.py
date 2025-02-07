@@ -5,6 +5,8 @@ import socket
 import subprocess
 import time
 
+import psutil
+
 from pylad.config import create_instrument_from_json_file
 
 
@@ -49,13 +51,29 @@ with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
         # If we don't have enough disk space left for a run,
         # then abort!
         total, used, free = shutil.disk_usage('C:/')
-        free_gb = free / (2**30)
+        free_gb = round(free / 2**30, 2)
+        print(f'Available disk space: {free_gb} GB')
         if free_gb < 5:
             print(
-                'The Varex computer is almost out of memory! '
+                'The Varex computer is almost out of disk space! '
                 f'Only {free_gb} GB remain! Please delete runs from '
                 f'the run directory at {WRITE_DIR} before running again. '
                 'Verify these runs are saved on s3dftn before deleting.'
+            )
+            s.sendall(b'NOT OK')
+            continue
+
+        mem = psutil.virtual_memory()
+        available_gb = round(mem.available / 2**30, 2)
+        print(f'Available RAM: {available_gb} GB')
+        if available_gb < 1:
+            print(
+                'The Varex computer is almost out of RAM! '
+                f'Only {available_gb} GB remain! You may need to '
+                'restart this client script, as there is a '
+                'known small memory leak in the XISL library that we '
+                'are unable to clean up. This memory leak might fill up '
+                'the RAM after about 200 runs or so.'
             )
             s.sendall(b'NOT OK')
             continue
