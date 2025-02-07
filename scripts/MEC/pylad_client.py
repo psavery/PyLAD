@@ -66,14 +66,14 @@ with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
         mem = psutil.virtual_memory()
         available_gb = round(mem.available / 2**30, 2)
         print(f'Available RAM: {available_gb} GB')
-        if available_gb < 1:
+        if available_gb < 3:
             print(
                 'The Varex computer is almost out of RAM! '
                 f'Only {available_gb} GB remain! You may need to '
                 'restart this client script, as there is a '
                 'known small memory leak in the XISL library that we '
                 'are unable to clean up. This memory leak might fill up '
-                'the RAM after about 200 runs or so.'
+                'the RAM after about 100 runs or so.'
             )
             s.sendall(b'NOT OK')
             continue

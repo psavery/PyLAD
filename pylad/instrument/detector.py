@@ -377,7 +377,10 @@ class Detector:
             )
             self.save_background_frame(img, event_number)
             if self.perform_background_median:
-                self.background_frames.append(img)
+                # We *must* copy the array, because these arrays still refer
+                # to the memory in the ring buffer, and the array will be modified
+                # when the ring buffer cycles back around.
+                self.background_frames.append(img.copy())
 
             if (
                 background_frame_idx == self.num_background_frames - 1 and
