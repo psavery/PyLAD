@@ -66,7 +66,7 @@ with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
         mem = psutil.virtual_memory()
         available_gb = round(mem.available / 2**30, 2)
         print(f'Available RAM: {available_gb} GB')
-        if available_gb < 3:
+        if available_gb < 4:
             print(
                 'The Varex computer is almost out of RAM! '
                 f'Only {available_gb} GB remain! You may need to '

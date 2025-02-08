@@ -92,6 +92,7 @@ class Detector:
         self.background_subtracted_data_paths: list[Path] = []
         self.background_frames: list[np.ndarray] = []
         self.perform_background_median = True
+        self.approximate_background_median_with_mean = True
         self._saved_median_dark_subtraction_path: Path | None = None
 
         self.max_seconds_between_frames = 15
@@ -509,10 +510,21 @@ class Detector:
             return
 
         logger.info(f'{self.name}: Performing median on background frames...')
-        background = np.median(self.background_frames, axis=0)
+        if self.approximate_background_median_with_mean:
+            logger.info(
+                f'{self.name}: Approximating median by performing mean '
+                '(which is faster and pretty close to the median). If you '
+                'do not wish to do this, set '
+                '"approximate_background_median_with_mean" to False.'
+            )
+            background = np.mean(self.background_frames, axis=0)
+            label = 'mean'
+        else:
+            background = np.median(self.background_frames, axis=0)
+            label = 'median'
 
         num_frames = len(self.background_frames)
-        filename = f'{self.file_prefix}_background_median_of_{num_frames}_frames_{self.name}.tiff'
+        filename = f'{self.file_prefix}_background_{label}_of_{num_frames}_frames_{self.name}.tiff'
         save_path = Path(self.save_files_path).resolve() / filename
         self.save_frame(background, save_path)
         self._saved_median_dark_subtraction_path = save_path
