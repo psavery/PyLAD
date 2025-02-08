@@ -85,12 +85,10 @@ class Detector:
         self.num_data_frames = 1
         self.num_post_shot_background_frames = 0
 
-        # "background_frames" is the list of background frames we have acquired
-        # It is only used if `self.perform_background_median` is `True`
         self.acquiring_frames = False
         self.data_paths: list[Path] = []
         self.background_subtracted_data_paths: list[Path] = []
-        self.background_frames: list[np.ndarray] = []
+        self.background_file_paths: list[Path] = []
         self.perform_background_median = True
         self.approximate_background_median_with_mean = True
         self._saved_median_dark_subtraction_path: Path | None = None
@@ -233,7 +231,7 @@ class Detector:
 
         self.data_paths.clear()
         self.background_subtracted_data_paths.clear()
-        self.background_frames.clear()
+        self.background_file_paths.clear()
         self.frame_statistics.clear()
 
         # Only activate the frame sync mode immediately before acquisition,
@@ -377,11 +375,6 @@ class Detector:
                 f'{self.name}: Encountered background frame. Storing...'
             )
             self.save_background_frame(img, event_number)
-            if self.perform_background_median:
-                # We *must* copy the array, because these arrays still refer
-                # to the memory in the ring buffer, and the array will be modified
-                # when the ring buffer cycles back around.
-                self.background_frames.append(img.copy())
 
             if (
                 background_frame_idx == self.num_background_frames - 1 and
@@ -445,7 +438,7 @@ class Detector:
         self.save_background_subtracted_data_files()
 
         # Free up some memory
-        self.background_frames.clear()
+        self.background_file_paths.clear()
         self.all_expected_frames_received = True
 
         self.acquisition_finished = True
@@ -502,12 +495,17 @@ class Detector:
     def save_background_frame(self, img: np.ndarray, idx: int):
         filename = f'{self.file_prefix}_evt_{idx}_{self.name}_background.tiff'
         save_path = Path(self.save_files_path).resolve() / filename
+        self.background_file_paths.append(save_path)
         self.save_frame(img, save_path)
 
     def save_background_median(self):
-        if not self.background_frames:
+        if not self.background_file_paths:
             # Nothing to do...
             return
+
+        background_frames = []
+        for path in self.background_file_paths:
+            background_frames.append(np.array(Image.open(path)))
 
         logger.info(f'{self.name}: Performing median on background frames...')
         if self.approximate_background_median_with_mean:
@@ -517,13 +515,13 @@ class Detector:
                 'do not wish to do this, set '
                 '"approximate_background_median_with_mean" to False.'
             )
-            background = np.mean(self.background_frames, axis=0)
+            background = np.mean(background_frames, axis=0)
             label = 'mean'
         else:
-            background = np.median(self.background_frames, axis=0)
+            background = np.median(background_frames, axis=0)
             label = 'median'
 
-        num_frames = len(self.background_frames)
+        num_frames = len(background_frames)
         filename = f'{self.file_prefix}_background_{label}_of_{num_frames}_frames_{self.name}.tiff'
         save_path = Path(self.save_files_path).resolve() / filename
         self.save_frame(background, save_path)
