@@ -425,9 +425,6 @@ class Detector:
     def on_acquisition_complete(self):
         logger.info(f'{self.name}: Received all frames. Finalizing...')
 
-        # First, stop the acquisition so we won't acquire more frames
-        self.stop_acquisition()
-
         if self.perform_background_median:
             logger.info(
                 f'{self.name}: Performing median background subtraction...'
@@ -442,6 +439,11 @@ class Detector:
         self.all_expected_frames_received = True
 
         self.acquisition_finished = True
+
+        # It takes like 11 seconds to stop the acquisition, so do it at the
+        # end, so that the preview window from the pylad client can go ahead
+        # and open up.
+        self.stop_acquisition()
 
     @property
     def time_since_last_frame_or_acquisition_start(self) -> float:
