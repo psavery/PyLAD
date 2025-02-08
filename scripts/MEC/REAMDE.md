@@ -71,6 +71,28 @@ it is completely do-able, and only the MEC operator needs to define the
 setup where 120 x-ray pulses will be coming per second, while triggers to
 the detector only come once per second.
 
+Setting up Varex RDP
+====================
+
+From the MEC DAQ computer, first SSH into psmeclogin with graphics forwarding,
+like so:
+
+```bash
+ssh -Y <username>@psmeclogin
+```
+
+After you have signed in using your password, run the following command:
+
+```bash
+xfreerdp -f mec-varex@172.21.43.22
+```
+
+The `-f` is for fullscreen. This should open up a new RDP window on the MEC
+DAQ computer that displays the Varex computer. It is through RDP that you
+must start up the command prompt and run `.\run_pylad_client.bat` in order
+to run the pylad client. Leave the RDP window open, as previews of the
+run data will be displayed using `pylad-viewer` each time a run is performed.
+
 MEC Files
 =========
 
