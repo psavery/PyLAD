@@ -26,7 +26,7 @@ ssh -Y <username>@psmeclogin
 After you have signed in using your password, run the following command:
 
 ```bash
-xfreerdp -f mec-varex@172.21.43.22
+xfreerdp -f -u mec-varex@172.21.43.22
 ```
 
 The `-f` is for fullscreen. This should open up a new RDP window on the MEC
